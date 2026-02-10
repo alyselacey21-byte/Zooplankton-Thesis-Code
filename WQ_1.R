@@ -6,7 +6,7 @@ nchar(WaterQuality)
 class(WaterQuality)
 typeof(WaterQuality)
 str(WaterQuality)
-
+# Code above is out of date and unneeded, Do not run
 
 library(tidyverse)
 library(mgcv)
