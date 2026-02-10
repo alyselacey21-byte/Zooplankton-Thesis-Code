@@ -75,54 +75,10 @@ print(IEP2000)
 
 #Attempt Successful, use IEP2000 from here on
 
-#Attempt to remove all NA values in year
-IEP2000_NA_Year <- IEP2000[complete.cases(IEP2000[,"Year"]),]
-print(IEP2000_NA_Year)
+#Attempt to remove all NA values
+IEP_No_NA <- IEP2000[complete.cases(IEP2000[ , c(1,2,5,8,13,15,16,18,20,27)]),]
 
-#Attempt Successful, use IEP2000_NA_Year from here on
-
-#I will now be using the first letter of each column for the object name until all rows I want to clean, are cleaned.
-# Year = "Y" now, pH = "p" now, etc
-
-#Attempt to remove all NA values in pH
-IEP2000_NA_Y_p <- IEP2000_NA_Year[complete.cases(IEP2000_NA_Year[,"pH"]),]
-print(IEP2000_NA_Y_p)
-
-#Attempt Successful, use IEP2000_NA_Y_p from here on
-
-#Attempt to remove all NA values in SalSurf 
-IEP2000_NA_Y_p_S <- IEP2000_NA_Y_p[complete.cases(IEP2000_NA_Y_p[,"SalSurf"]),]
-print(IEP2000_NA_Y_p_S)
-
-#Attempt Successful, use IEP2000_NA_Y_p_S from here on
-
-#Attempt to remove all NA values in Temperature 
-IEP2000_NA_Y_p_S_Te <- IEP2000_NA_Y_p_S[complete.cases(IEP2000_NA_Y_p_S[,"Temperature"]),]
-print(IEP2000_NA_Y_p_S_Te)
-
-#Attempt Successful, use IEP2000_NA_Y_p_S_Te from here on
-
-
-#Attempt to remove all NA values in Turbidity 
-IEP2000_NA_Y_p_S_Te_Tu <- IEP2000_NA_Y_p_S_Te[complete.cases(IEP2000_NA_Y_p_S_Te[,"Turbidity"]),]
-print(IEP2000_NA_Y_p_S_Te_Tu)
-
-#Attempt Successful, use IEP2000_NA_Y_p_S_Te_Tu from here on
-
-
-#Attempt to remove all NA values in Chlorophyll (Chl) 
-IEP2000_NA_Y_p_S_Te_Tu_C <- IEP2000_NA_Y_p_S_Te_Tu[complete.cases(IEP2000_NA_Y_p_S_Te_Tu[,"Chl"]),]
-print(IEP2000_NA_Y_p_S_Te_Tu_C)
-
-#Attempt Successful, use IEP2000_NA_Y_p_S_Te_Tu_C from here on
-
-
-#Attempt to remove all NA values in Family
-IEP2000_clean <- IEP2000_NA_Y_p_S_Te_Tu_C[complete.cases(IEP2000_NA_Y_p_S_Te_Tu_C[,"Family"]),]
-print(IEP2000_clean)
-
-#Attempt Successful, use IEP2000_clean from here on
-
+#Attempt Successful, use IEP_No_NAfrom here on
 
 
 #I will now be using the first letter of each column for the object name until all rows I want to remove, are removed.
@@ -130,8 +86,8 @@ print(IEP2000_clean)
 
 #Now I will attempt to remove columns that I am not using
 
-#Attempt to remove bottomdepth Column
-IEP2000_remove <- IEP2000_clean %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum)
+#Attempt to remove unneeded Columns
+IEP2000_remove <- IEP_No_NA %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum)
 print(IEP2000_remove)
 
 #Attempt successful, use IEP2000_remove
