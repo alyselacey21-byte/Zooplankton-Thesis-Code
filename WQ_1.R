@@ -61,4 +61,4 @@ dt1 <-read.csv(infile1,header=F
 
 unlink(infile1)
 
-
+head(dt1)
