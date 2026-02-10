@@ -78,7 +78,14 @@ print(IEP2000)
 #Attempt to remove all NA values
 IEP_No_NA <- IEP2000[complete.cases(IEP2000[ , c(1,2,5,8,13,15,16,18,20,27)]),]
 
-#Attempt Successful, use IEP_No_NAfrom here on
+#Attempt Successful, use IEP_No_NA from here on
+
+
+#Check the number of unique values in class to see if it is a possible stat representation for Zoops
+
+length(unique(IEP2000_remove$Class))
+#Only 4 unique values, too zoomed out, I will remove. 
+
 
 
 #I will now be using the first letter of each column for the object name until all rows I want to remove, are removed.
@@ -87,11 +94,10 @@ IEP_No_NA <- IEP2000[complete.cases(IEP2000[ , c(1,2,5,8,13,15,16,18,20,27)]),]
 #Now I will attempt to remove columns that I am not using
 
 #Attempt to remove unneeded Columns
-IEP2000_remove <- IEP_No_NA %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum)
+IEP2000_remove <- IEP_No_NA %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum, -Class)
 print(IEP2000_remove)
 
 #Attempt successful, use IEP2000_remove
-
 
 
 
