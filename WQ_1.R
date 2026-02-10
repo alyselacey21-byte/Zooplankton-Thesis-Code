@@ -75,7 +75,9 @@ print(IEP2000)
 
 #Attempt Successful, use IEP2000 from here on
 
-
+#Attempt to remove all NA values in year
+IEP2000_NA_Year <- IEP2000[complete.cases(IEP2000[,"Year"]),]
+print(IEP2000_NA_Year)
 
 
 
