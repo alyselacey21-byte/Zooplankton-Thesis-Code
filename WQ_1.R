@@ -64,27 +64,24 @@ unlink(infile1)
 head(dt1)
 
 
-#Attempt to remove all years before 2000
+#Attempt to remove all years before 1986
 
 head(dt1)
 
-IEP2000 <- subset(dt1, Year>1999)
+IEP1986 <- subset(dt1, Year>1985)
 
-tail(IEP2000)
-print(IEP2000)
+tail(IEP1986)
+print(IEP1986)
 
-#Attempt Successful, use IEP2000 from here on
+#Attempt Successful, use IEP1986 from here on
 
 #Attempt to remove all NA values
-IEP_No_NA <- IEP2000[complete.cases(IEP2000[ , c(1,2,5,8,13,15,16,18,20,27)]),]
+IEP_No_NA <- IEP1986 %>% drop_na(Genus) %>% drop_na(Year) %>% drop_na(Station) %>% drop_na(Temperature) %>% 
+  drop_na(Turbidity) %>% drop_na(Chl) %>% drop_na(SalSurf) %>% drop_na(pH) %>% drop_na(Genus) %>% 
+  drop_na(CPUE) %>% drop_na(Secchi)
+
 
 #Attempt Successful, use IEP_No_NA from here on
-
-
-#Check the number of unique values in class to see if it is a possible stat representation for Zoops
-
-length(unique(IEP2000_remove$Class))
-#Only 4 unique values, too zoomed out, I will remove. 
 
 
 
@@ -94,43 +91,43 @@ length(unique(IEP2000_remove$Class))
 #Now I will attempt to remove columns that I am not using
 
 #Attempt to remove unneeded Columns
-IEP2000_remove <- IEP_No_NA %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum, -Class)
-print(IEP2000_remove)
+IEP1986_remove <- IEP_No_NA %>% select(-BottomDepth, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott,-Species, -Phylum, -Class, -Datetime, -Microcystis,)
+print(IEP1986_remove)
 
-#Attempt successful, use IEP2000_remove
+#Attempt successful, use IEP1986_remove
 
 
 #Check the number of unique values in Order, Faimly, and Genus to see if it is a possible stat representation for Zoops
 
-length(unique(IEP2000_remove$Order))
+length(unique(IEP1986_remove$Order))
 #Only 6 unique values
-sort(unique(IEP2000_remove$Order))
+sort(unique(IEP1986_remove$Order))
 
 
-length(unique(IEP2000_remove$Family))
-#Only 20 unique values
-sort(unique(IEP2000_remove$Family))
+length(unique(IEP1986_remove$Family))
+#Only 19 unique values
+sort(unique(IEP1986_remove$Family))
 
 
-length(unique(IEP2000_remove$Genus))
-#Only 27 unique values
-sort(unique(IEP2000_remove$Genus))
+length(unique(IEP1986_remove$Genus))
+#Only 26 unique values
+sort(unique(IEP1986_remove$Genus))
 
 #Checking the amount of NA values present in each column
-colSums(is.na(IEP2000_remove))
+colSums(is.na(IEP1986_remove))
 #Order and Family have 0 NA values, Genus has 9998 NA values 
 
-#I think the best to use is Family for most amount of unique value and least amount of NA colums removes
-
+#################Use Genus####################
 
 
 #Checking the amount of 0 values present in each column 
-colSums(IEP2000_remove == 0, na.rm = TRUE)
+colSums(IEP1986_remove == 0, na.rm = TRUE)
 
-#Chl = 370 == 0
-#Turbidity = 3908 == 0
-#CPUE = 89353 == 0
-
+#Chl = 338 == 0
+#Turbidity = 3364 == 0
+#CPUE = 80625 == 0
+#Volume = 50 == 0
+#Undersampled = 72472 ==0
 
 
 
