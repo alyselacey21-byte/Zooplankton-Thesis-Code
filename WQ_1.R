@@ -1,3 +1,4 @@
+
 WaterQuality <- read.csv("C:/Users/al-la/Downloads/SMSCG_wq_data_2017-2023_clean_tzone.csv")
 head(WaterQuality)
 tail(WaterQuality)
@@ -8,30 +9,7 @@ str(WaterQuality)
 
 
 library(tidyverse)
-<<<<<<< HEAD
-library(mgcv)
-=======
 library(mgcv)
 
-#github test1
 
 
-#check check one two one two tr
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> faba84a6237cdd4d308ff3f92c1496e403a07039
