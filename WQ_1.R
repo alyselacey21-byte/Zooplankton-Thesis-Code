@@ -116,9 +116,21 @@ length(unique(IEP2000_remove$Genus))
 #Only 27 unique values
 sort(unique(IEP2000_remove$Genus))
 
+#Checking the amount of NA values present in each column
 colSums(is.na(IEP2000_remove))
 #Order and Family have 0 NA values, Genus has 9998 NA values 
 
 #I think the best to use is Family for most amount of unique value and least amount of NA colums removes
+
+
+
+#Checking the amount of 0 values present in each column 
+colSums(IEP2000_remove == 0, na.rm = TRUE)
+
+#Chl = 370 == 0
+#Turbidity = 3908 == 0
+#CPUE = 89353 == 0
+
+
 
 
