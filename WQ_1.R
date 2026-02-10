@@ -100,9 +100,25 @@ print(IEP2000_remove)
 #Attempt successful, use IEP2000_remove
 
 
+#Check the number of unique values in Order, Faimly, and Genus to see if it is a possible stat representation for Zoops
+
+length(unique(IEP2000_remove$Order))
+#Only 6 unique values
+sort(unique(IEP2000_remove$Order))
 
 
+length(unique(IEP2000_remove$Family))
+#Only 20 unique values
+sort(unique(IEP2000_remove$Family))
 
 
+length(unique(IEP2000_remove$Genus))
+#Only 27 unique values
+sort(unique(IEP2000_remove$Genus))
+
+colSums(is.na(IEP2000_remove))
+#Order and Family have 0 NA values, Genus has 9998 NA values 
+
+#I think the best to use is Family for most amount of unique value and least amount of NA colums removes
 
 
