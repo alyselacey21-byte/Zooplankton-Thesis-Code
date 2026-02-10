@@ -62,3 +62,23 @@ dt1 <-read.csv(infile1,header=F
 unlink(infile1)
 
 head(dt1)
+
+
+#Attempt to remove all years before 2000
+
+head(dt1)
+
+IEP2000 <- subset(dt1, Year>1999)
+
+tail(IEP2000)
+print(IEP2000)
+
+#Attempt Successful, use IEP2000 from here on
+
+
+
+
+
+
+
+
