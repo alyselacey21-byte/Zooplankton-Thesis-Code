@@ -123,3 +123,24 @@ print(IEP2000_clean)
 
 #Attempt Successful, use IEP2000_clean from here on
 
+
+
+#I will now be using the first letter of each column for the object name until all rows I want to remove, are removed.
+# Year = "Y" now, pH = "p" now, etc.
+
+#Now I will attempt to remove columns that I am not using
+
+#Attempt to remove bottomdepth Column
+IEP2000_remove <- IEP2000_clean %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum)
+print(IEP2000_remove)
+
+#Attempt successful, use IEP2000_remove
+
+
+
+
+
+
+
+
+
