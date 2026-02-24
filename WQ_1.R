@@ -131,13 +131,13 @@ colSums(IEP2000_remove ==0 , na.rm = TRUE)
 
 #Histograms 
 Z_Turbidity <- IEP2000_remove$Turbidity 
-hist(Z_Turbidity)
+hist(log10(Z_Turbidity))
 
 Z_Year <- IEP2000_remove$Year
 hist(Z_Year)
 
 Z_Chl <- IEP2000_remove$Chl
-hist(Z_Chl)
+hist(log10(Z_Chl))
 
 Z_Secchi <- IEP2000_remove$Secchi
 hist(Z_Secchi)
@@ -149,13 +149,13 @@ Z_pH <- IEP2000_remove$pH
 hist(Z_pH)
 
 Z_DO <- IEP2000_remove$DO
-hist(Z_DO)
+hist(log10(Z_DO))
 
 Z_SalSurf <- IEP2000_remove$SalSurf
 hist(Z_SalSurf)
 
 Z_Volume <- IEP2000_remove$Volume
-hist(Z_Volume)
+hist(log10(Z_Volume))
 
 Z_CPUE <- IEP2000_remove$CPUE
 hist(log10(Z_CPUE))
