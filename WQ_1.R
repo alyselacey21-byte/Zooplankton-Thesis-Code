@@ -162,4 +162,43 @@ hist(log10(Z_CPUE))
 
 # break the cpue down by taxon and make a graph
 
+library("tidyverse")
 
+#Loop one at a ime by pressing enter
+
+for (g in unique(IEP2000_remove$Genus)) {
+  df_sub <- IEP2000_remove[IEP2000_remove$Genus == g, ]
+  
+  p <- ggplot(df_sub, aes(x = Genus, y = CPUE, fill = Genus)) +
+    geom_col(width = 0.4, show.legend = FALSE) +
+    geom_errorbar(
+      data = df_sub,
+      aes(x = Genus, ymin = CPUE - SE, ymax = CPUE + SE),
+      width = 0.1,
+      color = "gray30"
+    ) +
+    labs(title = paste("CPUE for", g), x = "Genus", y = "CPUE (catch per unit effort)") +
+    theme_classic() +
+    theme(
+      axis.text.x = element_text(face = "italic"),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+  
+  print(p)
+  readline(prompt = "Press [Enter] for next genus...")
+}
+
+
+#facetwrap
+IEP2000_remove_NA <- IEP2000_remove[!is.na(IEP2000_remove$Genus), ]
+
+ggplot(IEP2000_remove_NA, aes(x = Genus, y = CPUE, fill = Genus)) + 
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = CPUE, ymax = CPUE), width = 0.15, color = "gray30") +
+  facet_wrap(~ Genus, scales = "free_x") +
+  labs(title = "CPUE by Genus", x = "Genus", y = "CPUE (catch per unit effort)") +
+  theme_classic() +
+  theme(axis.text.x = element_text(face = "italic"),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        strip.text = element_text(face = "italic"))
+ #remove NAs from the facet_wrap too
