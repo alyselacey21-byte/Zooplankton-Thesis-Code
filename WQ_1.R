@@ -164,7 +164,7 @@ hist(log10(Z_CPUE))
 
 library("tidyverse")
 
-#Loop one at a ime by pressing enter
+#Loop one at a time by pressing enter
 
 for (g in unique(IEP2000_remove$Genus)) {
   df_sub <- IEP2000_remove[IEP2000_remove$Genus == g, ]
@@ -173,7 +173,7 @@ for (g in unique(IEP2000_remove$Genus)) {
     geom_col(width = 0.4, show.legend = FALSE) +
     geom_errorbar(
       data = df_sub,
-      aes(x = Genus, ymin = CPUE - SE, ymax = CPUE + SE),
+      aes(x = Genus, ymin = CPUE, ymax = CPUE),
       width = 0.1,
       color = "gray30"
     ) +
@@ -202,3 +202,297 @@ ggplot(IEP2000_remove_NA, aes(x = Genus, y = CPUE, fill = Genus)) +
         plot.title = element_text(hjust = 0.5, face = "bold"),
         strip.text = element_text(face = "italic"))
  #remove NAs from the facet_wrap too
+
+ #Individual histograms
+library("tidyverse")
+library("dplyr")
+library("ggthemes")
+
+ggplot(IEP2000_remove_NA, aes(fill=Genus, y=CPUE, x=Genus)) + 
+  geom_bar(position='stack', stat='identity') +
+  theme_wsj()
+
+Acanthocyclops <- "Acanthocyclops"
+
+# Filter for that genus
+Acanthocyclops_filtered <- IEP2000_remove %>%
+  filter(Genus == Acanthocyclops)
+
+ggplot(Acanthocyclops_filtered, aes(x = Acanthocyclops)) +
+  geom_bar(binwidth = 0.5, fill = "red", color = "black") +
+  labs(title = "CPUE of Acanthocyclops", x = "Acanthocyclops", y = "CPUE")
+
+
+
+Acartia <- "Acartia"
+
+# Filter for that genus
+Acartia_filtered <- IEP2000_remove %>%
+  filter(Genus == Acartia)
+
+ggplot(Acartia_filtered, aes(x = Acartia)) +
+  geom_bar(binwidth = 0.5, fill = "#f18e8a", color = "black") +
+  labs(title = "CPUE of Acartia", x = "Acartia", y = "CPUE")
+
+
+Acartiella <- "Acartiella"
+
+# Filter for that genus
+Acartiella_filtered <- IEP2000_remove %>%
+  filter(Genus == Acartiella)
+
+ggplot(Acartiella_filtered, aes(x = Acartiella)) +
+  geom_bar(binwidth = 0.5, fill = "#7e0c08", color = "black") +
+  labs(title = "CPUE of Acartiella", x = "Acartiella", y = "CPUE")
+
+
+
+Alienacanthomysis <- "Alienacanthomysis"
+
+# Filter for that genus
+Alienacanthomysis_filtered <- IEP2000_remove %>%
+  filter(Genus == Alienacanthomysis)
+
+ggplot(Alienacanthomysis_filtered, aes(x = Alienacanthomysis)) +
+  geom_bar(binwidth = 0.5, fill = "orange", color = "black") +
+  labs(title = "CPUE of Alienacanthomysis", x = "Alienacanthomysis", y = "CPUE")
+
+
+
+Americorophium <- "Americorophium "
+
+# Filter for that genus
+Americorophium_filtered <- IEP2000_remove %>%
+  filter(Genus == Americorophium)
+
+ggplot(Americorophium_filtered, aes(x = Americorophium)) +
+  geom_bar(binwidth = 0.5, fill = "#ecae59", color = "black") +
+  labs(title = "CPUE of Americorophium", x = "Americorophium", y = "CPUE")
+
+
+
+Asplanchna <- "Asplanchna"
+
+# Filter for that genus
+Asplanchna_filtered <- IEP2000_remove %>%
+  filter(Genus == Asplanchna)
+
+ggplot(Asplanchna_filtered, aes(x = Asplanchna)) +
+  geom_bar(binwidth = 0.5, fill = "#955b0b", color = "black") +
+  labs(title = "CPUE of Asplanchna", x = "Asplanchna", y = "CPUE")
+
+
+
+Bosmina <- "Bosmina"
+
+# Filter for that genus
+Bosmina_filtered <- IEP2000_remove %>%
+  filter(Genus == Bosmina)
+
+ggplot(Bosmina_filtered, aes(x = Bosmina)) +
+  geom_bar(binwidth = 0.5, fill = "yellow", color = "black") +
+  labs(title = "CPUE of Bosmina", x = "Bosmina", y = "CPUE")
+
+
+
+Crangonyx <- "Crangonyx"
+
+# Filter for that genus
+Crangonyx_filtered <- IEP2000_remove %>%
+  filter(Genus == Crangonyx)
+
+ggplot(Crangonyx_filtered, aes(x = Crangonyx)) +
+  geom_bar(binwidth = 0.5, fill = "#d2d67a", color = "black") +
+  labs(title = "CPUE of Crangonyx", x = "Crangonyx", y = "CPUE")
+
+
+
+Daphnia <- "Daphnia"
+
+# Filter for that genus
+Daphnia_filtered <- IEP2000_remove %>%
+  filter(Genus == Daphnia)
+
+ggplot(Daphnia_filtered, aes(x = Daphnia)) +
+  geom_bar(binwidth = 0.5, fill = "#a6ad06", color = "black") +
+  labs(title = "CPUE of Daphnia", x = "Daphnia", y = "CPUE")
+
+
+
+Eurytemora <- "Eurytemora"
+
+# Filter for that genus
+Eurytemora_filtered <- IEP2000_remove %>%
+  filter(Genus == Eurytemora)
+
+ggplot(Eurytemora_filtered, aes(x = Eurytemora)) +
+  geom_bar(binwidth = 0.5, fill = "#91e296", color = "black") +
+  labs(title = "CPUE of Eurytemora", x = "Eurytemora", y = "CPUE")
+
+
+
+Gammarus <- "Gammarus"
+
+# Filter for that genus
+Gammarus_filtered <- IEP2000_remove %>%
+  filter(Genus == Gammarus)
+
+ggplot(Gammarus_filtered, aes(x = Gammarus)) +
+  geom_bar(binwidth = 0.5, fill = "#037a0b", color = "black") +
+  labs(title = "CPUE of Gammarus", x = "Gammarus", y = "CPUE")
+
+
+
+Hyalella <- "Hyalella"
+
+# Filter for that genus
+Hyalella_filtered <- IEP2000_remove %>%
+  filter(Genus == Hyalella)
+
+ggplot(Hyalella_filtered, aes(x = Hyalella)) +
+  geom_bar(binwidth = 0.5, fill = "blue", color = "black") +
+  labs(title = "CPUE of Hyalella", x = "Hyalella", y = "CPUE")
+
+
+Hyperacanthomysis <- "Hyperacanthomysis"
+
+# Filter for that genus
+Hyperacanthomysis_filtered <- IEP2000_remove %>%
+  filter(Genus == Hyperacanthomysis)
+
+ggplot(Hyperacanthomysis_filtered, aes(x = Hyperacanthomysis)) +
+  geom_bar(binwidth = 0.5, fill = "#50ecf2", color = "black") +
+  labs(title = "CPUE of Hyperacanthomysis", x = "Hyperacanthomysis", y = "CPUE")
+
+
+Keratella <- "Keratella"
+
+# Filter for that genus
+Keratella_filtered <- IEP2000_remove %>%
+  filter(Genus == Keratella)
+
+ggplot(Keratella_filtered, aes(x = Keratella)) +
+  geom_bar(binwidth = 0.5, fill = "#a4b8ee", color = "black") +
+  labs(title = "CPUE of Keratella", x = "Keratella", y = "CPUE")
+
+
+Limnoithona <- "Limnoithona"
+
+# Filter for that genus
+Limnoithona_filtered <- IEP2000_remove %>%
+  filter(Genus == Limnoithona)
+
+ggplot(Limnoithona_filtered, aes(x = Limnoithona)) +
+  geom_bar(binwidth = 0.5, fill = "#08319f", color = "black") +
+  labs(title = "CPUE of Limnoithona", x = "Limnoithona", y = "CPUE")
+
+
+Neomysis <- "Neomysis"
+
+# Filter for that genus
+Neomysis_filtered <- IEP2000_remove %>%
+  filter(Genus == Neomysis)
+
+ggplot(Neomysis_filtered, aes(x = Neomysis)) +
+  geom_bar(binwidth = 0.5, fill = "#bceaec", color = "black") +
+  labs(title = "CPUE of Neomysis", x = "Neomysis", y = "CPUE")
+
+
+Oithona <- "Oithona"
+
+# Filter for that genus
+Oithona_filtered <- IEP2000_remove %>%
+  filter(Genus == Oithona)
+
+ggplot(Oithona_filtered, aes(x = Oithona)) +
+  geom_bar(binwidth = 0.5, fill = "#07868b", color = "black") +
+  labs(title = "CPUE of Oithona", x = "Oithona", y = "CPUE")
+
+
+Orientomysis <- "Orientomysis"
+
+# Filter for that genus
+Orientomysis_filtered <- IEP2000_remove %>%
+  filter(Genus == Orientomysis)
+
+ggplot(Orientomysis_filtered, aes(x = Orientomysis)) +
+  geom_bar(binwidth = 0.5, fill = "purple", color = "black") +
+  labs(title = "CPUE of Orientomysis", x = "Orientomysis", y = "CPUE")
+
+
+Polyarthra <- "Polyarthra"
+
+# Filter for that genus
+Polyarthra_filtered <- IEP2000_remove %>%
+  filter(Genus == Polyarthra)
+
+ggplot(Polyarthra_filtered, aes(x = Polyarthra)) +
+  geom_bar(binwidth = 0.5, fill = "#d197dc", color = "black") +
+  labs(title = "CPUE of Polyarthra", x = "Polyarthra", y = "CPUE")
+
+
+
+Pseudodiaptomus <- "Pseudodiaptomus"
+
+# Filter for that genus
+Pseudodiaptomus_filtered <- IEP2000_remove %>%
+  filter(Genus == Pseudodiaptomus)
+
+ggplot(Pseudodiaptomus_filtered, aes(x = Pseudodiaptomus)) +
+  geom_bar(binwidth = 0.5, fill = "#84049c", color = "black") +
+  labs(title = "CPUE of Pseudodiaptomus", x = "Pseudodiaptomus", y = "CPUE")
+
+
+Sinocalanus <- "Sinocalanus"
+
+# Filter for that genus
+Sinocalanus_filtered <- IEP2000_remove %>%
+  filter(Genus == Sinocalanus)
+
+ggplot(Sinocalanus_filtered, aes(x = Sinocalanus)) +
+  geom_bar(binwidth = 0.5, fill = "#f133b4", color = "black") +
+  labs(title = "CPUE of Sinocalanus", x = "Sinocalanus", y = "CPUE")
+
+
+Sinocorophium <- "Sinocorophium"
+
+# Filter for that genus
+Sinocorophium_filtered <- IEP2000_remove %>%
+  filter(Genus == Sinocorophium)
+
+ggplot(Sinocorophium_filtered, aes(x = Sinocorophium)) +
+  geom_bar(binwidth = 0.5, fill = "#e5a8d1", color = "black") +
+  labs(title = "CPUE of Sinocorophium", x = "Sinocorophium", y = "CPUE")
+
+
+Synchaeta <- "Synchaeta"
+
+# Filter for that genus
+Synchaeta_filtered <- IEP2000_remove %>%
+  filter(Genus == Synchaeta)
+
+ggplot(Synchaeta_filtered, aes(x = Synchaeta)) +
+  geom_bar(binwidth = 0.5, fill = "#8d0560", color = "black") +
+  labs(title = "CPUE of Synchaeta", x = "Synchaeta", y = "CPUE")
+
+
+Tortanus <- "Tortanus"
+
+# Filter for that genus
+Tortanus_filtered <- IEP2000_remove %>%
+  filter(Genus == Tortanus)
+
+ggplot(Tortanus_filtered, aes(x = Tortanus)) +
+  geom_bar(binwidth = 0.5, fill = "#81f94e", color = "black") +
+  labs(title = "CPUE of Tortanus", x = "Tortanus", y = "CPUE")
+
+
+Trichocerca <- "Trichocerca"
+
+# Filter for that genus
+Trichocerca_filtered <- IEP2000_remove %>%
+  filter(Genus == Trichocerca)
+
+ggplot(Trichocerca_filtered, aes(x = Trichocerca)) +
+  geom_bar(binwidth = 0.5, fill = "#709f5c", color = "black") +
+  labs(title = "CPUE of Trichocerca", x = "Trichocerca", y = "CPUE")
