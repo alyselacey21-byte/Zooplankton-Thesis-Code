@@ -203,7 +203,8 @@ ggplot(IEP2000_remove_NA, aes(x = Genus, y = CPUE, fill = Genus)) +
         strip.text = element_text(face = "italic"))
  #remove NAs from the facet_wrap too
 
- #Individual histograms
+
+#stacked bargraphs
 library("tidyverse")
 library("dplyr")
 library("ggthemes")
@@ -211,6 +212,80 @@ library("ggthemes")
 ggplot(IEP2000_remove_NA, aes(fill=Genus, y=CPUE, x=Genus)) + 
   geom_bar(position='stack', stat='identity') +
   theme_wsj()
+
+
+#another try
+
+ggplot(IEP2000_remove_NA, aes(x = Year, y = CPUE, fill = Genus)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))(26)) +
+  labs(x = "Year", y = "CPUE", title = "Stacked CPUE by Genus") +
+  theme_classic() +
+  theme(
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 7),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+#Attempt for years prior to 2000
+IEP1999 <- subset(dt1, Year<2000)
+IEP1999_NA <- IEP1999[!is.na(IEP1999$Genus), ]
+
+ggplot(IEP1999_NA, aes(x = Year, y = CPUE, fill = Genus)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))(26)) +
+  labs(x = "Year", y = "CPUE", title = "Stacked CPUE by Genus") +
+  theme_classic() +
+  theme(
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 7),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+#attempt for all years
+dt1_NA<- dt1[!is.na(dt1$Genus), ]
+
+ggplot(dt1_NA, aes(x = Year, y = CPUE, fill = Genus)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))(26)) +
+  labs(x = "Year", y = "CPUE", title = "Stacked CPUE by Genus") +
+  theme_classic() +
+  theme(
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 7),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+#teasing out chlorophyll levels over years
+dt1_NA_Chl<- dt1[!is.na(dt1$Chl), ]
+
+ggplot(dt1_NA_Chl, aes(x = log10(Chl))) +
+  geom_bar( color = "blue") +
+  labs(title = "Chlorophyll concentration", x = "Chlorophyll", y = "Micrograms Per Liter")
+
+
+ggplot(dt1_NA_Chl, aes(x = Year, y = log10(Chl))) +
+  geom_jitter( color = "blue") +
+  labs(title = "Chlorophyll concentration per year", x = "Year", y = "Chlorophyll (Micrograms Per Liter)")
+
+ggplot(dt1_NA_Chl, aes(x = Year, y = Chl)) +
+  geom_jitter( color = "green") +
+  labs(title = "Chlorophyll concentration per year", x = "Year", y = "Chlorophyll (Micrograms Per Liter)")
+
+ggplot(dt1_NA_Chl, aes(x = Year, y = log10(Chl))) +
+  geom_point( color = "blue") +
+  labs(title = "Chlorophyll concentration per year", x = "Year", y = "Chlorophyll (Micrograms Per Liter)")
+
+ggplot(dt1_NA_Chl, aes(x = Year, y = Chl)) +
+  geom_point( color = "green") +
+  labs(title = "Chlorophyll concentration per year", x = "Year", y = "Chlorophyll (Micrograms Per Liter)")
+
+
+
+#Individual histograms
+
 
 Acanthocyclops <- "Acanthocyclops"
 
