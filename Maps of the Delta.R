@@ -4,17 +4,17 @@ install.packages("sf")
 install.packages("terra")
 install.packages("tmap", repos = c("https://r-tmap.r-universe.dev","https://cloud.r-project.org"))
 install.packages("spData")
-#Not available for this version of R install.packages("spDataLarge")
+install.packages("spDataLarge", repos = c("https://geocompx.r-universe.dev"))
 install.packages("leaflet")
 install.packages("USAboundaries")
-install.packages("USAboundariesData")
+install.packages("USAboundariesData", repos = c("https://ropensci.r-universe.dev","https://cloud.r-project.org"))
 
 
 library(sf)
 library(terra)
 library(dplyr)
 library(spData)
-#Not available for this version of R library(spDataLarge)
+library(spDataLarge)
 library(leaflet) # for interactive maps
 library(ggplot2) # tidyverse data visualization package
 library(tmap)    # for static and interactive maps

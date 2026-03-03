@@ -50,3 +50,7 @@ dt1 <-read.csv(infile1,header=F
                  "Undersampled"    ), check.names=TRUE)
 
 unlink(infile1)
+
+
+
+Directed_Outflow_Project_Lower_Trophic_Study <- subset(dt1, Genus == "DOP")

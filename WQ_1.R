@@ -334,11 +334,11 @@ ggplot(Alienacanthomysis_filtered, aes(x = Alienacanthomysis)) +
 
 
 
-Americorophium <- "Americorophium "
+Americorophium <- "Americorophium"
 
 # Filter for that genus
 Americorophium_filtered <- IEP2000_remove %>%
-  filter(Genus == Americorophium)
+  filter(Genus == "Americorophium")
 
 ggplot(Americorophium_filtered, aes(x = Americorophium)) +
   geom_bar(binwidth = 0.5, fill = "#ecae59", color = "black") +
