@@ -1,0 +1,40 @@
+#Maps of the Delta
+
+install.packages("sf")
+install.packages("terra")
+install.packages("tmap", repos = c("https://r-tmap.r-universe.dev","https://cloud.r-project.org"))
+install.packages("spData")
+#Not available for this version of R install.packages("spDataLarge")
+install.packages("leaflet")
+install.packages("USAboundaries")
+install.packages("USAboundariesData")
+
+
+library(sf)
+library(terra)
+library(dplyr)
+library(spData)
+#Not available for this version of R library(spDataLarge)
+library(leaflet) # for interactive maps
+library(ggplot2) # tidyverse data visualization package
+library(tmap)    # for static and interactive maps
+library(USAboundaries)
+library(USAboundariesData)
+
+# Get U.S. states geometry
+states <- us_states()
+
+# Filter for California
+california <- subset(us_counties(), state_name == "California")
+
+
+tm_shape(california) +   tm_fill() +
+  tm_borders() 
+
+# Create a simple map of California
+tm_shape(california) +
+  tm_borders(lwd = 2, col = "black") +   # State border
+  tm_fill(col = "steelblue") +           # Fill color
+  tm_layout(title = "California Map",
+            title.size = 1.2,
+            frame = FALSE)
