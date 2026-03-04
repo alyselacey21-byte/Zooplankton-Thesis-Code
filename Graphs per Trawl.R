@@ -79,9 +79,6 @@ dt1 %>%
 
 
 
-
-
-
 #these histograms and objects are for total per line observations, not for per day/date observations. Each line has one type of Zoop so it inflates the number of observations depending on the amount of zoops recorded. 
 Directed_Outflow_Project_Lower_Trophic_Study <- subset(dt1, Source == "DOP")
 

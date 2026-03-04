@@ -52,5 +52,29 @@ dt1 <-read.csv(infile1,header=F
 unlink(infile1)
 
 
+library(RColorBrewer)
 
-Directed_Outflow_Project_Lower_Trophic_Study <- subset(dt1, Genus == "DOP")
+dt1 %>%
+  mutate(Year = year(as.Date(Date))) %>%
+  filter(Genus %in% c("Asplanchna", "Keratella", "Polyartha", "Synchaeta", "Trichocerca")) %>%
+  group_by(Year, Genus) %>%
+  summarise(CPUE = sum(CPUE, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = Year, y = CPUE, fill = Genus)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = colorRampPalette(RColorBrewer::brewer.pal(5, "Paired"))(5)) +
+  labs(
+    x = "Year",
+    y = "CPUE",
+    title = "Stacked CPUE by Genus (Selected Rotifera)"
+  ) +
+  theme_classic() +
+  theme(
+    legend.key.size = unit(0.4, "cm"),
+    legend.text = element_text(size = 7),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+
+
+
+
