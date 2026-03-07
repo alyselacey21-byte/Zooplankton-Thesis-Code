@@ -59,16 +59,16 @@ dt1 %>%
          Year = year(Date),
          MonthDay = format(Date, "%m-%d")) %>%
   distinct(Source, Year, MonthDay) %>%
-  ggplot(aes(x = MonthDay, y = factor(Year), fill = Source)) +
+  ggplot(aes(x = factor(Year), y = MonthDay, fill = Source)) +
   geom_tile(color = "white", linewidth = 0.3) +
-  scale_x_discrete(breaks = c("01-01", "02-01", "03-01", "04-01", "05-01",
+  scale_y_discrete(breaks = c("01-01", "02-01", "03-01", "04-01", "05-01",
                               "06-01", "07-01", "08-01", "09-01", "10-01",
                               "11-01", "12-01"),
                    labels = month.abb) +
   labs(
     title = "Sampling Dates by Year and Trawl Source",
-    x = "Date",
-    y = "Year",
+    x = "Year",
+    y = "Date",
     fill = "Trawl Source"
   ) +
   theme_bw() +
