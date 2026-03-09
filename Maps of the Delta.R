@@ -1,7 +1,11 @@
 #Maps of the Delta
 
 install.packages("sf")
-install.packages("terra")
+# Always use binary (faster, no prompt)
+install.packages("terra", type = "binary")
+
+# Always use source (latest version)
+install.packages("terra", type = "source")
 install.packages("tmap", repos = c("https://r-tmap.r-universe.dev","https://cloud.r-project.org"))
 install.packages("spData")
 install.packages("spDataLarge", repos = c("https://geocompx.r-universe.dev"))
@@ -33,8 +37,20 @@ tm_shape(california) +   tm_fill() +
 
 # Create a simple map of California
 tm_shape(california) +
-  tm_borders(lwd = 2, col = "black") +   # State border
-  tm_fill(col = "steelblue") +           # Fill color
-  tm_layout(title = "California Map",
-            title.size = 1.2,
+  tm_polygons(col = "lightblue", border.col = "black", lwd = 2) +
+  tm_layout(main.title = "California Map",
+            main.title.size = 1.2,
+            main.title.position = "center",
             frame = FALSE)
+
+
+#Store California as an object
+map_Cal = tm_shape(california) +
+  tm_polygons(col = "lightblue", border.col = "black", lwd = 2) +
+  tm_layout(main.title = "California Map",
+            main.title.size = 1.2,
+            main.title.position = "center",
+            frame = FALSE)
+
+map_Cal
+
