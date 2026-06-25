@@ -287,6 +287,173 @@ ggplot(Zoop8,
   ) +
   theme_bw()
 
+#######################first half of the data#######################
+
+
+#Gammarus Genus
+
+#line and dot plot
+
+Zoop103 <- Zoop102 %>%
+  filter(Genus == "Gammarus") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(
+    mean_CPUE = mean(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(Zoop103,
+       aes(x = Month,
+           y = mean_CPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Gammarus CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
+
+
+
+
+
+#Acartiella
+
+Zoop104 <- Zoop102 %>%
+  filter(Genus == "Acartiella") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(
+    mean_CPUE = mean(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(Zoop104,
+       aes(x = Month,
+           y = mean_CPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Acartiella CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
+
+
+
+
+#Eurytemora
+
+Zoop105 <- Zoop102 %>%
+  filter(Genus == "Eurytemora") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(
+    mean_CPUE = mean(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(Zoop105,
+       aes(x = Month,
+           y = mean_CPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Eurytemora CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
+
+
+
+
+
+#Pseudodiaptomus
+
+Zoop106 <- Zoop102 %>%
+  filter(Genus == "Pseudodiaptomus") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(
+    mean_CPUE = mean(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(Zoop106,
+       aes(x = Month,
+           y = mean_CPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Pseudodiaptomus CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
+
+
+
+#Mysis
+Zoop107 <- Zoop102 %>%
+  filter(Genus %in% c(
+    "Alienacanthomysis",
+    "Deltamysis",
+    "Hyperacanthomysis",
+    "Neomysis",
+    "Orientomysis"
+  )) %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(
+    mean_CPUE = mean(CPUE, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(Zoop107,
+       aes(x = Month,
+           y = mean_CPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Mysis CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
 
 
 
