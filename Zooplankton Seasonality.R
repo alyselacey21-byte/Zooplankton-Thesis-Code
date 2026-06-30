@@ -456,4 +456,107 @@ ggplot(Zoop107,
   theme_bw()
 
 
+###################Gammarus from bay-delta benthic data######################
 
+library("lubridate")
+
+infile2 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/1036/7/1696d100de056ab584579f8df4a5ecd1") 
+infile2 <- sub("^https","http",infile2)
+
+dt2 <- read_delim(infile2,
+                  delim=",",
+                  skip=1,
+                  quote='"',
+                  col_names=c("Date","Station","Year","Month","OrganismCode",
+                              "MeanCPUE","TotalGrabs","Phylum","Class_level",
+                              "Order_level","Family_level","Genus","Species",
+                              "Common_name","Location","Latitude","Longitude"),
+                  col_types=list(
+                    col_datetime("%Y-%m-%dT%H:%M:%SZ"),  # <-- Z added
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(), 
+                    col_number(),
+                    col_number(),
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(),  
+                    col_character(), 
+                    col_number(),
+                    col_number()),
+                  na=c(" ",".","NA",""))
+
+
+
+Gam1 <- subset(dt2, Year>2004)
+head(Gam1)
+tail(Gam1)
+summary(Gam1)
+
+Gam100 <- subset(dt2, Year<1994)
+head(Gam100)
+tail(Gam100)
+summary(Gam100)
+
+
+library(dplyr)
+
+#####################Gam post 2004######################3
+Gam2 <- Gam1 %>%
+  filter(Genus == "Gammarus") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(MeanCPUE = mean(MeanCPUE, na.rm = TRUE),
+            .groups = "drop")
+
+ggplot(Gam2,
+       aes(x = Month,
+           y = MeanCPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Gammarus CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
+
+
+
+
+######################Gams pre 1994####################
+Gam101 <- Gam100 %>%
+  filter(Genus == "Gammarus") %>%
+  mutate(
+    Year = year(Date),
+    Month = month(Date, label = TRUE, abbr = TRUE)
+  ) %>%
+  group_by(Year, Month) %>%
+  summarize(MeanCPUE = mean(MeanCPUE, na.rm = TRUE),
+            .groups = "drop")
+
+ggplot(Gam101,
+       aes(x = Month,
+           y = MeanCPUE,
+           group = Year,
+           color = factor(Year))) +
+  geom_line() +
+  geom_point() +
+  labs(
+    title = "Monthly Mean Gammarus CPUE by Year",
+    x = "Month",
+    y = "Mean CPUE",
+    color = "Year"
+  ) +
+  theme_bw()
