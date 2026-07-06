@@ -2,11 +2,11 @@ options(repos = c(
   sbashevkin = 'https://sbashevkin.r-universe.dev',
   CRAN = 'https://cloud.r-project.org'))
 
-install.packages("deltamapr")
 
 library("deltamapr")
 library("ggplot2")
 library("sf")
+library("tidyverse")
 
 ggplot(R_EDSM_Subregions_Mahardja)+
   geom_sf(aes(fill=SubRegion))+
@@ -30,9 +30,6 @@ ggplot(R_EDSM_Subregions_Mahardja) +
   theme(legend.position = "none")
 
 
-install.packages("gridExtra")
-
-
 options(repos = c(
   sbashevkin = 'https://sbashevkin.r-universe.dev',
   CRAN = 'https://cloud.r-project.org'))
@@ -41,12 +38,13 @@ library("ggplot2")
 library("sf")
 library("dplyr")
 library("gridExtra")  # for combining map + table
+library("mgcv")
 
-Just split the key table into two side-by-side halves:
-  roptions(repos = c(
+
+#Just split the key table into two side-by-side halves:
+options(repos = c(
     sbashevkin = 'https://sbashevkin.r-universe.dev',
     CRAN = 'https://cloud.r-project.org'))
-install.packages("deltamapr")
 library("deltamapr")
 library("ggplot2")
 library("sf")
@@ -102,3 +100,111 @@ grob2 <- tableGrob(col2, rows = NULL,
 
 # Combine everything: map | col1 | col2
 grid.arrange(map_plot, grob1, grob2, ncol = 3, widths = c(2.5, 1, 1))
+
+
+
+###########Taking points from Zoop data and plotting them on the edsm subregion mapr###############
+library(tidyverse)
+library(mgcv)
+
+options(HTTPUserAgent="EDI_CodeGen")
+
+
+inUrl1  <- trimws("https://pasta.lternet.edu/package/data/eml/edi/539/4/58dd1dde8e38614a9cc48794f527bdec") 
+infile1 <- sub("^https","http",inUrl1)
+
+dt1 <-read_delim(infile1
+                 ,delim=","  
+                 ,skip=1
+                 ,quote = "" 
+                 ,col_names=c(
+                   "Source",     
+                   "Station",     
+                   "Latitude",     
+                   "Longitude",     
+                   "Year",     
+                   "Date",     
+                   "Datetime",     
+                   "SampleID",     
+                   "TowType",     
+                   "AmphipodCode",     
+                   "Tide",     
+                   "BottomDepth",     
+                   "Chl",     
+                   "Secchi",     
+                   "Temperature",     
+                   "Turbidity",     
+                   "Microcystis",     
+                   "pH",     
+                   "DO",     
+                   "SalSurf",     
+                   "SalBott",     
+                   "SizeClass",     
+                   "Volume",     
+                   "Phylum",     
+                   "Class",     
+                   "Order",     
+                   "Family",     
+                   "Genus",     
+                   "Species",     
+                   "Taxname",     
+                   "Lifestage",     
+                   "Taxlifestage",     
+                   "CPUE",     
+                   "Undersampled"    ), col_types=list(
+                     col_character(),
+                     col_character(),
+                     col_number(),
+                     col_number(),
+                     col_character(),
+                     col_date("%Y-%m-%d"),
+                     col_datetime("%Y-%m-%d %H:%M:%S"),
+                     
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_number(),
+                     col_number(),
+                     col_number(),
+                     col_number(),
+                     col_number(),
+                     col_character(),
+                     col_number(),
+                     col_number(),
+                     col_number(),
+                     col_number(),
+                     col_character(),
+                     col_number(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_character(),
+                     col_number(),
+                     col_character()),
+                 na=c("",".","NA",""))
+
+unlink(infile1)
+
+
+
+
+my_points <- dt1 %>% filter(!is.na(Latitude) & !is.na(Longitude)) %>% st_as_sf(coords = c("Longitude", "Latitude"),crs = 4326,remove = FALSE) %>% st_transform(st_crs(R_EDSM_Subregions_Mahardja))
+
+ggplot() + geom_sf(data = R_EDSM_Subregions_Mahardja, aes(fill = SubRegion), alpha = 0.6) + geom_sf(data = my_points, size = 1, color = "black", alpha = 0.5) + theme_bw() + theme(legend.position = "none") + labs(title = "EDSM Subregions with Sample Locations")
+
+
+unique(R_EDSM_Subregions_Mahardja$SubRegion)
+
+
+
+subregions_combined <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion != "San Francisco Bay", SubRegion !="South Bay", SubRegion !="Grant Line Canal and Old River", SubRegion != "Upper San Joaquin River") %>% mutate(Region = case_when(SubRegion %in% c("Lower Sacramento River Ship Channel", "Upper Sacramento River", "Upper Sacramento River Ship Channel") ~ "Sacramento River Ship Channel", SubRegion %in% c("Upper Sacramento River", "Middle Sacramento River", "Lower Sacramento River") ~ "Sacramento River", SubRegion %in% c("Upper Mokelumne River","Lower Mokelumne River") ~ "Mokelumne River", SubRegion %in% c("Upper Napa River", "Lower Napa River") ~ "Napa River", SubRegion %in% c("Cache Slough and Lindsey Slough", "Lower Cache Slough", "Liberty Island") ~ "Cache Slough Complex", SubRegion %in% c("Mid Suisun Bay", "West Suisun Bay", "Honker Bay") ~ "Suisun Bay", SubRegion %in% c("Franks Tract", "Holland Cut", "Mildred Island", "Disappointment Slough") ~ "Central Delta", SubRegion %in% c("San Joaquin River near Stockton","Lower San Joaquin River") ~ "San Joaquin River", SubRegion %in% c("San Joaquin River at Twitchell Island","San Joaquin River at Prisoners Pt","Georgiana Slough") ~ "Central San Joaquin",SubRegion %in% c("Rock Slough and Discovery Bay", "Victoria Canal") ~ "Southern Delta Canals", SubRegion %in% c("Old River", "Middle River") ~ "Old and Middle River",TRUE ~SubRegion  
+# keep all others as-is  
+)) %>% group_by(Region) %>% summarise(geometry = st_union(geometry))
+
+ggplot() + geom_sf(data = subregions_combined, aes(fill = Region), alpha = 0.6) + geom_sf(data = my_points, size = 1, color = "black", alpha = 0.5) + theme_bw() + theme(legend.position = "none") + labs(title = "EDSM Subregions with Sample Locations")
