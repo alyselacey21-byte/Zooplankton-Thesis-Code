@@ -203,8 +203,86 @@ unique(R_EDSM_Subregions_Mahardja$SubRegion)
 
 
 
-subregions_combined <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion != "San Francisco Bay", SubRegion !="South Bay", SubRegion !="Grant Line Canal and Old River", SubRegion != "Upper San Joaquin River") %>% mutate(Region = case_when(SubRegion %in% c("Lower Sacramento River Ship Channel", "Upper Sacramento River", "Upper Sacramento River Ship Channel") ~ "Sacramento River Ship Channel", SubRegion %in% c("Upper Sacramento River", "Middle Sacramento River", "Lower Sacramento River") ~ "Sacramento River", SubRegion %in% c("Upper Mokelumne River","Lower Mokelumne River") ~ "Mokelumne River", SubRegion %in% c("Upper Napa River", "Lower Napa River") ~ "Napa River", SubRegion %in% c("Cache Slough and Lindsey Slough", "Lower Cache Slough", "Liberty Island") ~ "Cache Slough Complex", SubRegion %in% c("Mid Suisun Bay", "West Suisun Bay", "Honker Bay") ~ "Suisun Bay", SubRegion %in% c("Franks Tract", "Holland Cut", "Mildred Island", "Disappointment Slough") ~ "Central Delta", SubRegion %in% c("San Joaquin River near Stockton","Lower San Joaquin River") ~ "San Joaquin River", SubRegion %in% c("San Joaquin River at Twitchell Island","San Joaquin River at Prisoners Pt","Georgiana Slough") ~ "Central San Joaquin",SubRegion %in% c("Rock Slough and Discovery Bay", "Victoria Canal") ~ "Southern Delta Canals", SubRegion %in% c("Old River", "Middle River") ~ "Old and Middle River",TRUE ~SubRegion  
+subregions_combined <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion != "San Francisco Bay", SubRegion !="South Bay", SubRegion !="Grant Line Canal and Old River", SubRegion != "Upper San Joaquin River") %>% mutate(Region = case_when(SubRegion %in% c("Lower Sacramento River Ship Channel", "Upper Sacramento River", "Upper Sacramento River Ship Channel") ~ "Sacramento River Ship Channel", SubRegion %in% c("Upper Sacramento River", "Lower Sacramento River") ~ "Sacramento River", SubRegion %in% c("Upper Mokelumne River","Lower Mokelumne River") ~ "Mokelumne River", SubRegion %in% c("Upper Napa River", "Lower Napa River") ~ "Napa River", SubRegion %in% c("Cache Slough and Lindsey Slough", "Lower Cache Slough", "Liberty Island") ~ "Cache Slough Complex", SubRegion %in% c("Mid Suisun Bay", "West Suisun Bay", "Honker Bay") ~ "Suisun Bay", SubRegion %in% c("Franks Tract", "Holland Cut", "Mildred Island") ~ "Central Delta", SubRegion %in% c("Lower San Joaquin River") ~ "San Joaquin River", SubRegion %in% c("San Joaquin River at Twitchell Island","San Joaquin River at Prisoners Pt","Georgiana Slough") ~ "Central San Joaquin",SubRegion %in% c("Rock Slough and Discovery Bay", "Victoria Canal") ~ "Southern Delta Canals", SubRegion %in% c("Old River", "Middle River") ~ "Old and Middle River",TRUE ~SubRegion  
 # keep all others as-is  
 )) %>% group_by(Region) %>% summarise(geometry = st_union(geometry))
 
 ggplot() + geom_sf(data = subregions_combined, aes(fill = Region), alpha = 0.6) + geom_sf(data = my_points, size = 1, color = "black", alpha = 0.5) + theme_bw() + theme(legend.position = "none") + labs(title = "EDSM Subregions with Sample Locations")
+
+
+
+
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+
+# Assign a number to every combined region
+map_data <- subregions_combined %>%
+  arrange(Region) %>%
+  mutate(key = row_number())
+
+# Build the map with numbers only
+map_plot <- ggplot(map_data) +
+  geom_sf(aes(fill = Region)) +
+  geom_sf_text(
+    aes(label = key),
+    size = 3,
+    fontface = "bold",
+    color = "black"
+  ) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(title = "Combined EDSM Regions")
+
+# Create the key table
+key_table <- map_data %>%
+  st_drop_geometry() %>%
+  select(`#` = key, Region) %>%
+  arrange(`#`)
+
+# Split the key into two columns
+half <- ceiling(nrow(key_table) / 2)
+
+col1 <- key_table[1:half, ]
+col2 <- key_table[(half + 1):nrow(key_table), ]
+
+# Pad second column if needed
+if (nrow(col2) < nrow(col1)) {
+  col2 <- col2 %>%
+    add_row(`#` = NA, Region = "")
+}
+
+# Create table grobs
+grob1 <- tableGrob(
+  col1,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 8,
+    core = list(padding = unit(c(2, 4), "mm")),
+    colhead = list(fg_params = list(fontface = "bold"))
+  )
+)
+
+grob2 <- tableGrob(
+  col2,
+  rows = NULL,
+  theme = ttheme_minimal(
+    base_size = 8,
+    core = list(padding = unit(c(2, 4), "mm")),
+    colhead = list(fg_params = list(fontface = "bold"))
+  )
+)
+
+# Display the map and key
+grid.arrange(
+  map_plot,
+  grob1,
+  grob2,
+  ncol = 3,
+  widths = c(2.5, 1, 1)
+)
+
+
+
