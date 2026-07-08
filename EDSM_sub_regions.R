@@ -286,3 +286,31 @@ grid.arrange(
 
 
 
+
+###################attempt at using strata vs. subregions######################
+
+ggplot(R_EDSM_Strata_1718P1)+
+  geom_sf(aes(fill=Stratum))+
+  theme_bw()
+
+
+
+my_data <- dt1 %>% filter(!is.na(Latitude) & !is.na(Longitude)) %>% st_as_sf(coords = c("Longitude", "Latitude"),crs = 4326,remove = FALSE) %>% st_transform(st_crs(R_EDSM_Strata_1718P1))
+
+ggplot() + geom_sf(data = R_EDSM_Strata_1718P1, aes(fill = Stratum), alpha = 0.6) + geom_sf(data = my_data, size = 1, color = "black", alpha = 0.5) + theme_bw() + theme(legend.position = "none") + labs(title = "EDSM Strata with Sample Locations")
+
+
+
+######################Adding San Pablo Bay ################
+san_pablo <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion == "San Pablo Bay") %>% mutate(Stratum = "San Pablo Bay")  # adds it into the Stratum fill aesthetic
+
+ggplot() +
+  geom_sf(data = R_EDSM_Strata_1718P1, aes(fill = Stratum), alpha = 0.6) +
+  geom_sf(data = san_pablo, aes(fill = Stratum), alpha = 0.6) +
+  geom_sf(data = my_data, size = 1, color = "black", alpha = 0.5) +
+  theme_bw() +
+  labs(title = "EDSM Strata with Sample Locations")
+
+####adding delta smelt sighting to the map so I can remove certain regions if needed#######
+
+
