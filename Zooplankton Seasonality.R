@@ -560,3 +560,13 @@ ggplot(Gam101,
     color = "Year"
   ) +
   theme_bw()
+
+
+
+
+
+########################zoop genus monthly spatial distribution average old and new #####################
+
+
+
+
