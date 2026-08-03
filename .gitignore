@@ -2,3 +2,14 @@
 .Rhistory
 .RData
 .Ruserdata
+*.csv
+*.rds
+Data_CSVs/
+Zoop_Communiy
+DWR_Benthic
+dayflow
+dayflow_70_83
+dayflow_84_96
+dayflow_97_23
+dayflow_X2
+dayflow_clean

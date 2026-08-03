@@ -312,5 +312,3 @@ ggplot() +
   labs(title = "EDSM Strata with Sample Locations")
 
 ####adding delta smelt sighting to the map so I can remove certain regions if needed#######
-
-
