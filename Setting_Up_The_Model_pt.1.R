@@ -606,4 +606,3 @@ organisms_combined %>%
 Zoop_Communiy %>%
   filter(Genus %in% target_genera | Genus %in% mysid_genera) %>%
   summarise(pct_na_species = mean(is.na(Species)))
-
