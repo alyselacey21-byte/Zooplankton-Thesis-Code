@@ -26,230 +26,279 @@ dayflow_84_96 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zo
 dayflow_97_23 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1997-2023.csv")
 
 
+##################################################################
+## PART 1 — Build the combined Dayflow dataset and calculate X2
+##################################################################
+#---------------------------------------------------------------
+# 1. Standardize column names across Dayflow datasets
+#---------------------------------------------------------------
 
+dayflow_97_23 <- dayflow_97_23 %>% rename(EXPORT = EXPORTS, DIVE    = DIVER, EFFECT  = EFFEC, EFFD    = EFFDIV)
 
-###########Calculation of X2 1975-1997ish#######
+#---------------------------------------------------------------
+# 2. Combine all Dayflow datasets
+#---------------------------------------------------------------
 
-# --- 6. Prep outflow for the log calculation ---
-# Floor outflow at 1 cfs whenever it's zero or negative (avoids log of non-positive number)
-dayflow <- dayflow %>%
-  mutate(Q_for_log = ifelse(OUT <= 0, 50, OUT))
+dayflow <- bind_rows(dayflow_70_83, dayflow_84_96, dayflow_97_23)
 
-# --- 7. Compute X2 recursively ---
+#---------------------------------------------------------------
+# 3. Convert Date column BEFORE sorting
+#---------------------------------------------------------------
+
+dayflow <- dayflow %>% mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>% arrange(Date)
+
+#---------------------------------------------------------------
+# 4. Verify combined dataset
+#---------------------------------------------------------------
+
+glimpse(dayflow)
+
+cat("\nDate range:\n")
+print(range(dayflow$Date, na.rm = TRUE))
+
+cat("\nDuplicate dates:\n")
+print(sum(duplicated(dayflow$Date)))
+
+#---------------------------------------------------------------
+# 5. Save combined Dayflow dataset
+#---------------------------------------------------------------
+
+write_csv(dayflow, "dayflow-combined-1970-2023.csv")
+
+#---------------------------------------------------------------
+# 6. Prepare outflow for recursive X2 calculation
+#
+# Replace zero or negative outflow with 50 cfs so log10()
+# remains defined.
+#---------------------------------------------------------------
+
+dayflow <- dayflow %>% mutate(Q_for_log = pmax(OUT, 50))
+
+#---------------------------------------------------------------
+# 7. Calculate X2
+#
+# Equation:
+# X2(t) = 10.16 + 0.945 * X2(t-1) -
+#         1.487 * log10(Q)
+#
+# Initial value has negligible influence after the burn-in period.
+#---------------------------------------------------------------
+
 n <- nrow(dayflow)
-X2 <- numeric(n)
-X2[1] <- 75   # chosen because I am not using the first 4ish years of data so the echo from this is minimal
 
-for (t in 2:n) {
-  X2[t] <- 10.16 + 0.945 * X2[t - 1] - 1.487 * log10(dayflow$Q_for_log[t])
-}
+X2_calc <- numeric(n)
+X2_calc[1] <- 75
 
-dayflow$X2 <- X2
+for (i in 2:n) {X2_calc[i] <- 10.16 + 0.945 * X2_calc[i - 1] - 1.487 * log10(dayflow$Q_for_log[i])}
 
-# --- 8. Discard burn-in period ---
-# With 0.945 decay, ~60 days is a safe margin for convergence
-dayflow_clean <- dayflow[-(1:60), ]
+dayflow <- dayflow %>% mutate(X2 = X2_calc)
 
-# --- 9. Save result ---
+#---------------------------------------------------------------
+# 8. Remove burn-in period
+#
+# Sixty days is sufficient for the recursive equation to
+# converge and minimizes dependence on the initial X2 value.
+#---------------------------------------------------------------
+
+burn_in_days <- 60
+
+dayflow_clean <- dayflow %>% slice(-(1:burn_in_days))
+
+#---------------------------------------------------------------
+# 9. Save final Dayflow dataset
+#---------------------------------------------------------------
+
 write_csv(dayflow_clean, "dayflow-combined-1970-2023-with-X2.csv")
 
-# Quick check
+#---------------------------------------------------------------
+# 10. Diagnostics
+#---------------------------------------------------------------
+
 head(dayflow_clean %>% select(Date, OUT, X2))
+
 tail(dayflow_clean %>% select(Date, OUT, X2))
+
 View(dayflow_clean)
 
 
 
-# --- 1. Harmonize column names ---
-# The column names drift slightly across eras. Rename the 1997-2023 file's
-# columns to match the earlier two so bind_rows lines them up correctly.
-dayflow_97_23 <- dayflow_97_23 %>%
-  rename(
-    EXPORT = EXPORTS,
-    DIVE   = DIVER,
-    EFFECT = EFFEC,
-    EFFD   = EFFDIV
+##################################################################
+## PART 2 — Save original datasets
+##################################################################
+
+saveRDS(Zoop_Communiy, "Zoop_Communiy.rds")
+
+saveRDS(DWR_Benthic, "DWR_Benthic.rds")
+
+saveRDS(dayflow_clean, "dayflow_clean.rds")
+
+# Quick inspection
+
+View(Zoop_Communiy)
+View(DWR_Benthic)
+View(dayflow_clean)
+
+
+
+##################################################################
+## PART 3 — Determine common study period
+##################################################################
+
+#---------------------------------------------------------------
+# Determine temporal coverage
+#---------------------------------------------------------------
+
+cat("\nZooplankton years:\n")
+print(range(Zoop_Communiy$Year, na.rm = TRUE))
+
+cat("\nBenthic years:\n")
+print(range(DWR_Benthic$Year, na.rm = TRUE))
+
+#---------------------------------------------------------------
+# Restrict both datasets to the common analysis period
+#
+# Common years:
+#   1975–2021
+#
+# Exclude:
+#   1994–2004
+#---------------------------------------------------------------
+
+Zoop_Communiy <- Zoop_Communiy %>% filter(Year >= 1975, Year <= 2021, !(Year >= 1994 & Year <= 2004))
+
+DWR_Benthic <- DWR_Benthic %>% filter(Year >= 1975, Year <= 2021, !(Year >= 1994 & Year <= 2004))
+
+#---------------------------------------------------------------
+# Verify filtering
+#---------------------------------------------------------------
+
+cat("\nZooplankton years after filtering:\n")
+print(range(Zoop_Communiy$Year, na.rm = TRUE))
+
+cat("\nBenthic years after filtering:\n")
+print(range(DWR_Benthic$Year, na.rm = TRUE))
+
+##################################################################
+## PART 4 — Clean and summarize each biological dataset
+##################################################################
+
+#---------------------------------------------------------------
+# Genera of interest
+#---------------------------------------------------------------
+
+mysid_genera <- c("Alienacanthomysis", "Deltamysis", "Hyperacanthomysis", "Neomysis", "Orientomysis")
+
+target_genera <- c("Eurytemora", "Pseudodiaptomus", "mysid_genera",  "Acartiella","Gammarus")
+
+ROUND_DIGITS <- 1
+
+
+##################################################################
+## Zooplankton
+##################################################################
+
+Zoop_Community_avg <- Zoop_Communiy %>% mutate(Date = as.Date(Date), Genus = if_else(Genus %in% mysid_genera, "mysid_genera", Genus), Lat_region = round(Latitude, ROUND_DIGITS), Long_region = round(Longitude, ROUND_DIGITS), Source = "Zooplankton") %>% filter(Genus %in% target_genera) %>% group_by(Lat_region, Long_region, Date,Genus) %>% summarise(CPUE = sum(CPUE, na.rm = TRUE), across(c(
+  Latitude, Longitude, BottomDepth, Chl, Secchi, Temperature, Turbidity, Microcystis, pH, DO, SalSurf, SalBott, Volume), ~ mean(.x, na.rm = TRUE)), across(c(Source, Station, Year, Datetime, SampleID, TowType, AmphipodCode, Tide, SizeClass, Phylum, Class, Order, Family, Species, Taxname, Lifestage, Taxlifestage, Undersampled), first), .groups = "drop")
+
+##################################################################
+## Benthic
+##################################################################
+
+DWR_Benthic_avg <- DWR_Benthic %>% mutate(Date = as.Date(substr(Date,1,10)), Genus = if_else(Genus %in% mysid_genera, "mysid_genera", Genus), Lat_region = round(Latitude, ROUND_DIGITS), Long_region = round(Longitude, ROUND_DIGITS), Source = "Benthic") %>% filter(Genus %in% target_genera) %>% group_by(Lat_region, Long_region, Date, Genus) %>% summarise(CPUE = sum(MeanCPUE, na.rm = TRUE), across(c(Latitude, Longitude, TotalGrabs), ~ mean(.x, na.rm = TRUE)), across(c( Source, Station, Year, Month, OrganismCode, Phylum, Class_level, Order_level, Family_level, Species, Common_name, Location), first), .groups = "drop") %>% rename(Class  = Class_level, Order  = Order_level, Family = Family_level)
+
+
+
+##################################################################
+## PART 5 — Diagnostics
+##################################################################
+
+cat("\nZooplankton observations:\n")
+print(nrow(Zoop_Community_avg))
+
+cat("\nBenthic observations:\n")
+print(nrow(DWR_Benthic_avg))
+
+
+cat("\nZooplankton years:\n")
+print(range(Zoop_Community_avg$Date))
+
+cat("\nBenthic years:\n")
+print(range(DWR_Benthic_avg$Date))
+
+
+##################################################################
+## Coordinate overlap
+##################################################################
+
+for (digits in 1:5) {
+  z <- Zoop_Community_avg %>%
+    mutate(Lat = round(Latitude, digits), Lon = round(Longitude, digits)) %>%
+    distinct(Lat, Lon)
+  
+  b <- DWR_Benthic_avg %>%
+    mutate(Lat = round(Latitude, digits), Lon = round(Longitude, digits)) %>%
+    distinct(Lat, Lon)
+  
+  cat(
+    digits, "decimal places:",
+    length(intersect(paste(z$Lat, z$Lon), paste(b$Lat, b$Lon))),
+    "shared locations\n"
   )
-
-# --- 2. Stack all three into one dataframe ---
-dayflow <- bind_rows(dayflow_70_83, dayflow_84_96, dayflow_97_23) %>%
-  arrange(Date)
-
-# --- 3. Quick check ---
-glimpse(dayflow)
-range(dayflow$Date)
-sum(duplicated(dayflow$Date))  # check for overlapping dates between files
-
-# --- 4. Date Mutation ---
-dayflow <- dayflow %>%
-  mutate(Date = as.Date(Date, format = "%m/%d/%Y")) %>%
-  arrange(Date)
-
-range(dayflow$Date)
-
-# --- 5. Save combined result ---
-write_csv(dayflow, "dayflow-combined-1970-2023.csv")
+}
 
 
 
-#######################Save the datasets#################
-saveRDS(Zoop_Communiy, "Zoop_Communiy")
-saveRDS(DWR_Benthic, "DWR_Benthic")
-saveRDS(dayflow_clean, "dayflow_clean") ###X2, Jersey Point Flow, and total outflows###
- #######test######
-view(Zoop_Communiy)
-view(DWR_Benthic)
-view(dayflow_clean)
+##################################################################
+## PART 6 — Combine biological datasets
+##################################################################
 
-###############Determination of earliest and latest cutoff dates###########
-unique(Zoop_Communiy$Year)
-Zoop_Communiy #1972-2021
-DWR_Benthic #1975-2025
+organisms_combined <- bind_rows(Zoop_Community_avg, DWR_Benthic_avg) 
 
-#1975-2021 is the time period. Remove 1994-2004.
+organisms_combined <- organisms_combined %>% relocate(Source, Date, Year, Lat_region, Long_region, Latitude, Longitude, Genus, Species, CPUE)
 
 
+##################################################################
+## Add Dayflow variables
+##################################################################
 
-###############Combine and average the dates with the same latitude and longitude##############
+organisms_combined <- organisms_combined %>% left_join(dayflow_clean %>% select(Date, OUT, X2, SAC, SJR, TOT, EXPORT), by="Date")
 
-# Genera of interest (raw genus names to recode as "mysid_genera")
-mysid_genera <- c("Alienacanthomysis", "Deltamysis", "Hyperacanthomysis",
-                  "Neomysis", "Orientomysis")
 
-target_genera <- c("Eurytemora", "Pseudodiaptomus", "mysid_genera", "Acartiella", "Gammarus")
+##################################################################
+## Final diagnostics
+##################################################################
 
-# --- Zoop Community ---
-Zoop_Community_avg <- Zoop_Communiy %>%
-  mutate(Genus_grouped = if_else(Genus %in% mysid_genera, "mysid_genera", Genus)) %>%
-  filter(Genus_grouped %in% target_genera) %>%
-  group_by(Latitude, Longitude, Date, Genus_grouped) %>%
-  summarise(
-    CPUE = sum(CPUE, na.rm = TRUE),
-    across(where(is.numeric) & !all_of("CPUE"), ~ mean(.x, na.rm = TRUE)),
-    across(where(is.character) & !all_of("Genus"), ~ first(na.omit(.x))),
-    .groups = "drop"
-  ) %>%
-  rename(Genus = Genus_grouped)
+cat("\nCombined rows:\n")
+print(nrow(organisms_combined))
 
-# --- DWR Benthic ---
-DWR_Benthic_avg <- DWR_Benthic %>%
-  mutate(Genus_grouped = if_else(Genus %in% mysid_genera, "mysid_genera", Genus)) %>%
-  filter(Genus_grouped %in% target_genera) %>%
-  group_by(Latitude, Longitude, Date, Genus_grouped) %>%
-  summarise(
-    CPUE = sum(MeanCPUE, na.rm = TRUE),
-    across(where(is.numeric) & !all_of(c("MeanCPUE")), ~ mean(.x, na.rm = TRUE)),
-    across(where(is.character) & !all_of("Genus"), ~ first(na.omit(.x))),
-    .groups = "drop"
-  ) %>%
-  rename(Genus = Genus_grouped)
+cat("\nRows by source:\n")
+print(table(organisms_combined$Source))
 
-# --- Fix DWR_Benthic date ---
-DWR_Benthic_avg <- DWR_Benthic_avg %>%
-  mutate(Date = as.Date(substr(Date, 1, 10)))
+cat("\nDayflow coverage:\n")
+print(mean(!is.na(organisms_combined$X2)))
 
-str(Zoop_Community_avg)
-glimpse(Zoop_Community_avg)
+cat("\nMissing CPUE:\n")
+print(sum(is.na(organisms_combined$CPUE)))
 
-unique(Zoop_Community_avg$Genus)
-unique(DWR_Benthic_avg$Genus)
+View(organisms_combined)
 
-# Look at raw rows for a specific date/site with multiple mysid genera
 Zoop_Communiy %>%
-  filter(Genus %in% mysid_genera, Date == "2019-04-01", Latitude == 38.16073)
+  mutate(
+    Genus = if_else(Genus %in% mysid_genera, "mysid_genera", Genus),
+    Lat_region = round(Latitude, ROUND_DIGITS),
+    Long_region = round(Longitude, ROUND_DIGITS)
+  ) %>%
+  filter(Genus %in% target_genera) %>%
+  distinct(Lat_region, Long_region, Date, Genus) %>%
+  nrow()
+######86459 check#####
 
-# Compare to the collapsed output for that same site/date
-Zoop_Community_avg %>%
-  filter(Genus == "mysid_genera", Date == "2019-04-01", Latitude == 38.16073)
+colSums(is.na(organisms_combined))
 
-nrow(Zoop_Communiy %>% filter(Genus %in% target_genera | Genus %in% mysid_genera))  # rows going in
-nrow(Zoop_Community_avg)  # rows coming out — should be smaller (collapsed) or equal, never larger
+organisms_combined %>%
+  filter(is.na(Species)) %>%
+  count(Source)
 
-summary(Zoop_Community_avg$CPUE)
-sum(is.na(Zoop_Community_avg$CPUE))
-
-View(Zoop_Community_avg)
-View(DWR_Benthic_avg)
-
-
-
-
-##########checks#########
-
-# 1. Confirm Date columns
-class(Zoop_Community_avg$Date)
-class(DWR_Benthic_avg$Date)
-head(DWR_Benthic_avg$Date)   # should now show clean yyyy-mm-dd, not the T00:00:00 version
-
-# 2. Get FULL precision lat/long, not tibble-truncated display
-options(pillar.sigfig = 10)   # forces tibble to show more digits
-Zoop_Community_avg %>% select(Latitude, Longitude) %>% slice(1:5)
-DWR_Benthic_avg %>% select(Latitude, Longitude) %>% slice(1:5)
-
-# 3. Actual numeric ranges (no truncation)
-range(Zoop_Community_avg$Longitude, na.rm = TRUE)
-range(DWR_Benthic_avg$Longitude, na.rm = TRUE)
-
-
-
-
-
-##################joining the datasets###########
-joined <- Zoop_Community_avg %>%
-  left_join(DWR_Benthic_avg, by = c("Latitude", "Longitude", "Date"))
-
-
-nrow(joined)
-mean(!is.na(joined$BottomDepth))
-
-# How many location matches exist, ignoring Date entirely?
-loc_only <- Zoop_Community_avg %>%
-  semi_join(DWR_Benthic_avg, by = c("Latitude", "Longitude"))
-nrow(loc_only)
-nrow(Zoop_Community_avg)
-
-# How many exact lat/long values are shared between the two datasets?
-length(intersect(
-  paste(Zoop_Community_avg$Latitude, Zoop_Community_avg$Longitude),
-  paste(DWR_Benthic_avg$Latitude, DWR_Benthic_avg$Longitude)
-))
-
-
-
-
-#################Label the time periods and separate the genera#########
-
-Zoop1 <- subset(dt1, Year>2004)
-head(Zoop1)
-tail(Zoop1)
-summary(Zoop1)
-
-Zoop100 <- subset(dt1, Year<1994)
-head(Zoop100)
-tail(Zoop100)
-summary(Zoop100)
-
-Zoop2 <- Zoop1 %>%
-  filter(Undersampled == FALSE)
-summary(Zoop2)
-head(Zoop2)
-tail(Zoop2)
-
-Zoop101 <- Zoop100 %>%
-  filter(Undersampled == FALSE)
-summary(Zoop101)
-head(Zoop101)
-tail(Zoop101)
-
-
-##########Check co-linearity before modeling##########
-
-zoop_model_data %>%
-  select(SalSurf, SalBott, Turbidity, Secchi, Temperature, Chl, OUT, X2, JerseyPointFlow, pH, month) %>%
-  cor(use = "pairwise.complete.obs") %>%
-  round(2)
-
-
-############Fit one GAM per taxon group, per period###########
-
-
+Zoop_Communiy %>%
+  filter(Genus %in% target_genera | Genus %in% mysid_genera) %>%
+  summarise(pct_na_species = mean(is.na(Species)))
