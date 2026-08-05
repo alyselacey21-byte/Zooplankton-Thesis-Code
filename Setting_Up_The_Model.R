@@ -25,7 +25,9 @@ dayflow_84_96 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zo
 
 dayflow_97_23 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1997-2023.csv")
 
-
+##################################################################
+## Section 1 — Biology datasets joining
+##################################################################
 ##################################################################
 ## PART 1 — Build the combined Dayflow dataset and calculate X2
 ##################################################################
@@ -302,3 +304,28 @@ organisms_combined %>%
 Zoop_Communiy %>%
   filter(Genus %in% target_genera | Genus %in% mysid_genera) %>%
   summarise(pct_na_species = mean(is.na(Species)))
+
+
+##################################################################
+## Section 2 - checking for tides
+##################################################################
+
+organisms_combined %>% filter(Source == "Zooplankton") %>% summarise(pct_missing_tide = mean(is.na(Tide)))
+#8.42% missing
+
+organisms_combined %>%
+  filter(Source == "Benthic") %>%
+  summarise(pct_missing_tide = mean(is.na(Tide)))
+#100% missing
+
+view(organisms_combined)
+
+##################################################################
+## Section 3 - checking for collinearity
+##################################################################
+
+
+
+
+
+
