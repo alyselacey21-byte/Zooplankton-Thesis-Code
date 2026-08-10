@@ -21,6 +21,7 @@ EMP_DWQ <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplank
 
 Station_Metadata_DWR <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/Station_metadata.csv")
 
+
 ####X2, Jersey Point Flow, and total outflows########
 dayflow_70_83 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1970-1983.csv")
 
@@ -173,7 +174,7 @@ cat("\nMissing EMP coordinates:\n"); print(sum(is.na(EMP_DWQ$Latitude)))
 ###############################################################
 ## PART 4 — MONTHLY EMP ENVIRONMENT DATA
 ###############################################################
-# FIX: "Turbidity" was reported under two incompatible instrument scales
+# "Turbidity" was reported under two incompatible instrument scales
 # (NTU pre-transition, FNU post-transition) but shared one Analyte label.
 # Without splitting these apart, the group-level mean below would blend
 # two different measurement scales as if they were the same variable.
@@ -202,6 +203,7 @@ EMP_monthly <- EMP_DWQ %>%
 cat("\nMonthly EMP rows:", nrow(EMP_monthly), "\n")
 cat("\nEMP monthly columns:\n"); print(names(EMP_monthly))
 
+view(EMP_monthly)
 ###############################################################
 ## PART 5 — BIOLOGICAL DATA
 ###############################################################
@@ -281,6 +283,7 @@ DWR_Benthic_avg <- DWR_Benthic %>%
     Source = "Benthic",
     .groups = "drop"
   )
+view(DWR_Benthic_avg)
 
 ###############################################################
 ## PART 6 — COMBINE ORGANISMS
@@ -322,6 +325,7 @@ organisms_combined <- organisms_combined %>%
 
 cat("\nColumns after EMP join:\n")
 print(names(organisms_combined))
+view(organisms_combined)
 
 ###############################################################
 ## PART 9 — CLEAN VARIABLE NAMES
@@ -410,3 +414,8 @@ organisms_model <- organisms_combined %>%
 
 saveRDS(organisms_model, "organisms_model_ready.rds")
 write_csv(organisms_model, "organisms_model_ready.csv")
+
+view(organisms_model)
+
+
+
