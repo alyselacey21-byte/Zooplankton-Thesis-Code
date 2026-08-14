@@ -457,13 +457,10 @@ organisms_model_reduced <- organisms_model %>%
     -`Dissolved Bromide`,
     -`Total Alkalinity`,
     -MVI,
-    # --- newly added: native/EMP-raw environmental columns, now redundant
-    # with the coalesced Final_* versions ---
     -Temperature, -Chl, -DO, -pH_zoop, -Turbidity, -SalSurf, -SalBott,
     -BottomDepth, -Secchi, -Microcystis, -Volume,
     -EMP_Temperature, -EMP_DO, -EMP_Chlorophyll, -EMP_Conductance,
     -EMP_pH, -EMP_Turbidity_NTU, -EMP_Turbidity_FNU, -EMP_Salinity,
-    # --- newly added: unused (Bottom) EMP columns ---
     -`(Bottom) Chlorophyll Fluorescence ug/L`,
     -`(Bottom) Dissolved Oxygen mg/L`,
     -`(Bottom) Specific Conductance`,
@@ -583,26 +580,9 @@ vif_model <- lm(
 cat("\n--- VIF ---\n")
 print(vif(vif_model))
 
-##################################################################
-## 5. Concurvity (GAM-specific nonlinear analog of collinearity)
-##################################################################
-
-gam_check <- gam(
-  CPUE ~ s(X2) + s(OUT) + s(Final_Temperature) + s(Final_Chl) +
-    s(Final_DO) + s(Final_pH) + s(Final_Turbidity) + s(Final_SalSurf) +
-    Genus + Source,
-  data = vif_data,
-  method = "REML"
-)
-
-cat("\n--- Concurvity: overall (worst-case row matters most) ---\n")
-print(concurvity(gam_check, full = TRUE))
-
-cat("\n--- Concurvity: pairwise (identifies which specific terms conflict) ---\n")
-print(concurvity(gam_check, full = FALSE))
 
 ##################################################################
-## 6. Distance correlation (general nonlinear association, pairwise)
+## 5. Distance correlation (general nonlinear association, pairwise)
 ##################################################################
 
 dcor_pairs <- list(
@@ -619,20 +599,18 @@ for (p in dcor_pairs) {
 }
 
 ##################################################################
-## 7. Condition number of the full design matrix
+## 6. Condition number of the full design matrix
 ##################################################################
 
-X <- model.matrix(~ Latitude + Longitude + Month_num + OUT + X2 +
-                    Final_Temperature + Final_Chl + Final_DO +
-                    Final_pH + Final_Turbidity + Final_SalSurf,
-                  data = vif_data)
-
-cat("\n--- Condition number (kappa) of design matrix ---\n")
-cat("Rule of thumb: <15 fine, 15-30 borderline, >30 real problem\n")
-print(kappa(X))
+X_scaled <- model.matrix(~ Latitude + Longitude + Month_num + OUT + X2 +
+                           Final_Temperature + Final_Chl + Final_DO +
+                           Final_pH + Final_Turbidity + Final_SalSurf,
+                         data = vif_data)
+X_scaled[, -1] <- scale(X_scaled[, -1])
+kappa(X_scaled)   # this is the one that means something
 
 ##################################################################
-## 8. Missingness tied to grouping variables (structural confound check)
+## 7. Missingness tied to grouping variables (structural confound check)
 ##################################################################
 
 cat("\n--- Coverage of key predictors by Source x Genus ---\n")
@@ -643,7 +621,7 @@ print(
 )
 
 ##################################################################
-## 9. Pairwise scatterplots (visual check for outlier-driven relationships)
+## 8. Pairwise scatterplots (visual check for outlier-driven relationships)
 ##################################################################
 
 ggpairs(vif_data %>% select(X2, OUT, Final_Temperature, Final_Chl, Final_DO, Final_SalSurf))
