@@ -16,6 +16,7 @@ library(car)
 library(corrplot)  
 library(energy)    
 library(GGally) 
+library(nlme)
 
 ##################################################################
 ## EURYTEMORA GAM SETUP
@@ -182,45 +183,214 @@ print(
 ##################################################################
 ## PART 8 — GAMs
 ##################################################################
+##################################################################
+## Pre-1994 GAM — FINAL
+## X2 at moderate k=15 (extensively tested up to k=150; edf never
+## stabilized below ceiling due to structural concurvity between X2
+## and calendar time - not a basis-dimension problem, documented as
+## a limitation rather than chased further). Year excluded (eta^2
+## with X2 = 0.59, confirmed redundant). Turbidity/DO/pH excluded -
+## genuinely unavailable pre-1994 (0% coverage), not a tradeoff.
+##################################################################
+eurytemora_pre1994 <- eurytemora_pre1994 %>%
+  mutate(Channel_Station = factor(Channel_Station))
 
-# Pre-1994: Turbidity/DO/pH excluded - genuinely unavailable (0% coverage),
-# not a sample-size tradeoff.
-gam_eurytemora_pre1994 <- gam(
-  CPUE ~ s(X2, k = 5) +
-    s(Final_Temperature, k = 5) +
-    s(Final_Chl, k = 5) +
-    s(Final_SalSurf, k = 5) +
-    s(Month_num, bs = "cc", k = 8) +
-    s(Year, bs = "re") +
+class(eurytemora_pre1994$Channel_Station)   # confirm it's now "factor"
+
+gam_eurytemora_pre1994_final <- gam(
+  CPUE ~ s(X2, k = 15) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 12) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
     s(Channel_Station, bs = "re"),
   family = tw(),
   method = "REML",
-  data = eurytemora_pre1994
+  data = eurytemora_pre1994,
+  knots = list(Month_num = c(0.5, 12.5))
 )
 
-summary(gam_eurytemora_pre1994)
-gam.check(gam_eurytemora_pre1994)
-concurvity(gam_eurytemora_pre1994, full = TRUE)
+summary(gam_eurytemora_pre1994_final)
+gam.check(gam_eurytemora_pre1994_final)
+concurvity(gam_eurytemora_pre1994_final, full = TRUE)
 
-# Post-2004: all four environmental variables included by choice, despite
-# reduced complete-case N (see Part 5) - documented as a limitation rather
-# than silently dropping variables for sample size.
-gam_eurytemora_post2004_full <- gam(
-  CPUE ~ s(X2, k = 5) +
-    s(Final_Temperature, k = 5) +
-    s(Final_Chl, k = 5) +
-    s(Final_Turbidity, k = 5) +
-    s(Final_DO, k = 5) +
-    s(Final_pH, k = 5) +
-    s(Final_SalSurf, k = 5) +
-    s(Month_num, bs = "cc", k = 8) +
-    s(Year, bs = "re") +
+# Residual autocorrelation check
+# (confirmed lag-1 ~0.47-0.48 in prior runs; AR(1) correction via gamm()
+# attempted but rejected - mgcv does not fully support Tweedie + gamm(),
+# confirmed by package warnings and a ~7x unexplained shift in scale
+# estimate. Documented as a limitation instead: standard errors and
+# significance tests likely understate true uncertainty.)
+acf_result_pre1994 <- acf(residuals(gam_eurytemora_pre1994_final), plot = FALSE)
+print(acf_result_pre1994$acf[1:10])
+
+plot(gam_eurytemora_pre1994_final, select = 1, shade = TRUE)
+
+##################################################################
+## Post-2004 GAM — moderate k from the start, Year excluded (same
+## structural reasoning as pre-1994), all four environmental
+## variables included per earlier decision (documented limitation
+## re: reduced complete-case N)
+##################################################################
+
+gam_eurytemora_post2004_final <- gam(
+  CPUE ~ s(X2, k = 15) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 10) +
+    s(Final_Turbidity, k = 10) +
+    s(Final_DO, k = 8) +
+    s(Final_pH, k = 8) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
     s(Channel_Station, bs = "re"),
   family = tw(),
   method = "REML",
-  data = eurytemora_post2004
+  data = eurytemora_post2004,
+  knots = list(Month_num = c(0.5, 12.5))
 )
 
-summary(gam_eurytemora_post2004_full)
-gam.check(gam_eurytemora_post2004_full)
-concurvity(gam_eurytemora_post2004_full, full = TRUE)
+summary(gam_eurytemora_post2004_final)
+gam.check(gam_eurytemora_post2004_final)
+concurvity(gam_eurytemora_post2004_final, full = TRUE)
+
+# Residual autocorrelation check, same as pre-1994
+acf_result_post2004 <- acf(residuals(gam_eurytemora_post2004_final), plot = FALSE)
+print(acf_result_post2004$acf[1:10])
+
+
+
+
+
+
+
+##################################################################
+## PART 9- PRESENTATION-READY X2 GAM PLOT
+##################################################################
+
+library(ggplot2)
+
+# Create prediction grid
+x2_grid <- data.frame(
+  X2 = seq(
+    min(eurytemora_pre1994$X2, na.rm = TRUE),
+    max(eurytemora_pre1994$X2, na.rm = TRUE),
+    length.out = 300
+  )
+)
+
+# Add values for the other predictors
+x2_grid$Final_Temperature <- median(
+  eurytemora_pre1994$Final_Temperature,
+  na.rm = TRUE
+)
+
+x2_grid$Final_Chl <- median(
+  eurytemora_pre1994$Final_Chl,
+  na.rm = TRUE
+)
+
+x2_grid$Final_SalSurf <- median(
+  eurytemora_pre1994$Final_SalSurf,
+  na.rm = TRUE
+)
+
+x2_grid$Month_num <- 6.5
+
+x2_grid$Longitude <- median(
+  eurytemora_pre1994$Longitude,
+  na.rm = TRUE
+)
+
+x2_grid$Latitude <- median(
+  eurytemora_pre1994$Latitude,
+  na.rm = TRUE
+)
+
+x2_grid$Year <- eurytemora_pre1994$Year[1]
+x2_grid$Channel_Station <- eurytemora_pre1994$Channel_Station[1]
+
+
+# Predictions from the GAM
+pred <- predict(
+  gam_eurytemora_pre1994,
+  newdata = x2_grid,
+  type = "terms",
+  se.fit = TRUE
+)
+
+# Extract X2 smooth
+x2_term <- grep(
+  "^s\\(X2\\)",
+  colnames(pred$fit),
+  value = TRUE
+)
+
+x2_grid$effect <- pred$fit[, x2_term]
+
+x2_grid$se <- pred$se.fit[, x2_term]
+
+# 95% confidence interval
+x2_grid <- x2_grid %>%
+  mutate(
+    lower = effect - 1.96 * se,
+    upper = effect + 1.96 * se
+  )
+
+
+##################################################################
+## PLOT
+##################################################################
+
+x2_figure <- ggplot(
+  x2_grid,
+  aes(x = X2, y = effect)
+) +
+  
+  geom_ribbon(
+    aes(ymin = lower, ymax = upper),
+    alpha = 0.20
+  ) +
+  
+  geom_line(
+    linewidth = 1.5
+  ) +
+  
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    linewidth = 0.7
+  ) +
+  
+  labs(
+    title = "Eurytemora abundance shows a nonlinear relationship with X2",
+    subtitle = "Preliminary generalized additive model | Pre-1994 observations",
+    x = "X2",
+    y = "Estimated partial effect on log(CPUE)"
+  ) +
+  
+  theme_classic(base_size = 18) +
+  
+  theme(
+    plot.title = element_text(
+      size = 22,
+      face = "bold"
+    ),
+    
+    plot.subtitle = element_text(
+      size = 16
+    ),
+    
+    axis.title = element_text(
+      size = 18,
+      face = "bold"
+    ),
+    
+    axis.text = element_text(
+      size = 15
+    ),
+    
+    plot.margin = margin(
+      20, 25, 20, 20
+    )
+  )
+
+x2_figure
