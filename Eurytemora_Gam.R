@@ -17,12 +17,15 @@ library(corrplot)
 library(energy)    
 library(GGally) 
 library(nlme)
+library(gratia)
+library(patchwork)
+
 
 ##################################################################
 ## EURYTEMORA GAM SETUP
 ## Uses organisms_model_reduced from Setting_Up_The_Model
 ##################################################################
-
+view(organisms_model_reduced)
 ##################################################################
 ## PART 1 — Subset to Eurytemora, confirm source
 ##################################################################
@@ -266,131 +269,207 @@ print(acf_result_post2004$acf[1:10])
 ## PART 9- PRESENTATION-READY X2 GAM PLOT
 ##################################################################
 
+quantile(eurytemora_pre1994$Final_Chl, probs = c(0.9, 0.95, 0.99), na.rm = TRUE)
+quantile(eurytemora_pre1994$Final_SalSurf, probs = c(0.9, 0.95, 0.99), na.rm = TRUE)
+quantile(eurytemora_pre1994$X2, probs = c(0.01, 0.05, 0.95, 0.99), na.rm = TRUE)
+
+
+gam_eurytemora_pre1994_plot <- gam(
+  CPUE ~ 
+    s(X2, k = 30) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 12) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
+    s(Channel_Station, bs = "re"),
+  family = tw(),
+  method = "REML",
+  data = eurytemora_pre1994,
+  knots = list(Month_num = c(0.5, 12.5))
+)
+
+gam.check(gam_eurytemora_pre1994_plot)
+
+
+library(mgcv)
 library(ggplot2)
+library(dplyr)
+library(patchwork)
 
-# Create prediction grid
-x2_grid <- data.frame(
-  X2 = seq(
-    min(eurytemora_pre1994$X2, na.rm = TRUE),
-    max(eurytemora_pre1994$X2, na.rm = TRUE),
-    length.out = 300
+# Get model predictions for each smooth
+p_x2 <- plot(
+  gam_eurytemora_pre1994_plot,
+  select = 1,
+  shade = TRUE,
+  seWithMean = TRUE,
+  rug = FALSE,
+  pages = 1
+)
+
+p_temp <- plot(
+  gam_eurytemora_pre1994_plot,
+  select = 2,
+  shade = TRUE,
+  seWithMean = TRUE,
+  rug = FALSE,
+  pages = 1
+)
+
+p_chl <- plot(
+  gam_eurytemora_pre1994_plot,
+  select = 3,
+  shade = TRUE,
+  seWithMean = TRUE,
+  rug = FALSE,
+  pages = 1
+)
+
+p_sal <- plot(
+  gam_eurytemora_pre1994_plot,
+  select = 4,
+  shade = TRUE,
+  seWithMean = TRUE,
+  rug = FALSE,
+  pages = 1
+)
+
+p_month <- plot(
+  gam_eurytemora_pre1994_plot,
+  select = 5,
+  shade = TRUE,
+  seWithMean = TRUE,
+  rug = FALSE,
+  pages = 1
+)
+
+get_smooth_data <- function(model, smooth_number, x_name, x_label) {
+  
+  pred <- plot(
+    model,
+    se = TRUE,
+    n = 200,
+    plot = FALSE
   )
-)
-
-# Add values for the other predictors
-x2_grid$Final_Temperature <- median(
-  eurytemora_pre1994$Final_Temperature,
-  na.rm = TRUE
-)
-
-x2_grid$Final_Chl <- median(
-  eurytemora_pre1994$Final_Chl,
-  na.rm = TRUE
-)
-
-x2_grid$Final_SalSurf <- median(
-  eurytemora_pre1994$Final_SalSurf,
-  na.rm = TRUE
-)
-
-x2_grid$Month_num <- 6.5
-
-x2_grid$Longitude <- median(
-  eurytemora_pre1994$Longitude,
-  na.rm = TRUE
-)
-
-x2_grid$Latitude <- median(
-  eurytemora_pre1994$Latitude,
-  na.rm = TRUE
-)
-
-x2_grid$Year <- eurytemora_pre1994$Year[1]
-x2_grid$Channel_Station <- eurytemora_pre1994$Channel_Station[1]
-
-
-# Predictions from the GAM
-pred <- predict(
-  gam_eurytemora_pre1994,
-  newdata = x2_grid,
-  type = "terms",
-  se.fit = TRUE
-)
-
-# Extract X2 smooth
-x2_term <- grep(
-  "^s\\(X2\\)",
-  colnames(pred$fit),
-  value = TRUE
-)
-
-x2_grid$effect <- pred$fit[, x2_term]
-
-x2_grid$se <- pred$se.fit[, x2_term]
-
-# 95% confidence interval
-x2_grid <- x2_grid %>%
-  mutate(
-    lower = effect - 1.96 * se,
-    upper = effect + 1.96 * se
-  )
-
-
-##################################################################
-## PLOT
-##################################################################
-
-x2_figure <- ggplot(
-  x2_grid,
-  aes(x = X2, y = effect)
-) +
   
-  geom_ribbon(
-    aes(ymin = lower, ymax = upper),
-    alpha = 0.20
-  ) +
+  # FIX: plot(..., plot = FALSE) always returns ALL smooth terms in the
+  # model, regardless of `select` - select only affects what gets drawn
+  # when actually plotting to a device. Previously this always indexed
+  # pred[[1]] (the X2 term), so every panel silently plotted X2's curve
+  # under a different label. Index by smooth_number to get the correct term.
+  term_data <- pred[[smooth_number]]
   
-  geom_line(
-    linewidth = 1.5
-  ) +
-  
-  geom_hline(
-    yintercept = 0,
-    linetype = "dashed",
-    linewidth = 0.7
-  ) +
-  
-  labs(
-    title = "Eurytemora abundance shows a nonlinear relationship with X2",
-    subtitle = "Preliminary generalized additive model | Pre-1994 observations",
-    x = "X2",
-    y = "Estimated partial effect on log(CPUE)"
-  ) +
-  
-  theme_classic(base_size = 18) +
-  
-  theme(
-    plot.title = element_text(
-      size = 22,
-      face = "bold"
-    ),
-    
-    plot.subtitle = element_text(
-      size = 16
-    ),
-    
-    axis.title = element_text(
-      size = 18,
-      face = "bold"
-    ),
-    
-    axis.text = element_text(
-      size = 15
-    ),
-    
-    plot.margin = margin(
-      20, 25, 20, 20
+  data.frame(
+    x = term_data$x,
+    fit = term_data$fit,
+    se = term_data$se,
+    x_label = x_label
+  ) %>%
+    mutate(
+      upper = fit + 1.96 * se,
+      lower = fit - 1.96 * se
     )
+}
+
+# Extract each smooth
+d_x2 <- get_smooth_data(
+  gam_eurytemora_pre1994_plot,
+  1,
+  "X2",
+  "Location"
+)
+
+d_temp <- get_smooth_data(
+  gam_eurytemora_pre1994_plot,
+  2,
+  "Final_Temperature",
+  "Temperature (°C)"
+)
+
+d_chl <- get_smooth_data(
+  gam_eurytemora_pre1994_plot,
+  3,
+  "Final_Chl",
+  "Chlorophyll-a"
+)
+
+d_sal <- get_smooth_data(
+  gam_eurytemora_pre1994_plot,
+  4,
+  "Final_SalSurf",
+  "Surface salinity"
+)
+
+d_month <- get_smooth_data(
+  gam_eurytemora_pre1994_plot,
+  5,
+  "Month_num",
+  "Month"
+)
+
+make_gam_plot <- function(dat, title, xlab) {
+  
+  ggplot(dat, aes(x = x, y = fit)) +
+    
+    geom_ribbon(
+      aes(ymin = lower, ymax = upper),
+      alpha = 0.20
+    ) +
+    
+    geom_hline(
+      yintercept = 0,
+      linetype = "dashed",
+      linewidth = 0.5
+    ) +
+    
+    geom_line(
+      linewidth = 1.2
+    ) +
+    
+    labs(
+      title = title,
+      x = xlab,
+      y = "Effect on log(CPUE)"
+    ) +
+    
+    theme_classic(base_size = 14) +
+    
+    theme(
+      plot.title = element_text(
+        face = "bold",
+        size = 15
+      ),
+      axis.title = element_text(
+        face = "bold"
+      ),
+      axis.text = element_text(
+        color = "black"
+      ),
+      plot.margin = margin(
+        10, 10, 10, 10
+      )
+    )
+}
+
+
+g_x2 <- make_gam_plot(d_x2, "Location", "Spatial gradient (X2)") +
+  coord_cartesian(xlim = c(44, 96))
+
+g_chl <- make_gam_plot(d_chl, "Chlorophyll-a", "Chlorophyll-a") +
+  coord_cartesian(xlim = c(0, 36))
+
+g_sal <- make_gam_plot(d_sal, "Surface salinity", "Surface salinity") +
+  coord_cartesian(xlim = c(0, 16.5))
+
+final_gam_figure <-
+  (g_x2 | g_temp | g_chl) /
+  (g_sal | g_month | plot_spacer()) +
+  plot_annotation(
+    title = "Environmental drivers of Eurytemora abundance",
+    subtitle = "GAM-estimated partial effects, pre-1994"
+  ) &
+  theme(
+    plot.title = element_text(size = 22, face = "bold"),
+    plot.subtitle = element_text(size = 15)
   )
 
-x2_figure
+final_gam_figure
