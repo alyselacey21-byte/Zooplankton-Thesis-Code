@@ -1,6 +1,10 @@
-############Making the GAM For Eurytemora###########
 
-#####Packages######
+
+############ Making the GAM For Eurytemora ###########
+## Consolidated version - all parts reordered so every object is
+## defined/created before it's referenced. Run top-to-bottom.
+
+##### Packages ######
 
 library(tidyverse)
 library(mgcv)
@@ -13,9 +17,9 @@ library(data.table)
 library(geosphere)
 library(wql)
 library(car)
-library(corrplot)  
-library(energy)    
-library(GGally) 
+library(corrplot)
+library(energy)
+library(GGally)
 library(nlme)
 library(gratia)
 library(patchwork)
@@ -26,6 +30,7 @@ library(patchwork)
 ## Uses organisms_model_reduced from Setting_Up_The_Model
 ##################################################################
 view(organisms_model_reduced)
+
 ##################################################################
 ## PART 1 — Subset to Eurytemora, confirm source
 ##################################################################
@@ -48,8 +53,6 @@ env_vars <- c("X2", "Final_Temperature", "Final_Chl", "Final_DO",
 cat("\nCoverage, full Eurytemora dataset:\n")
 print(eurytemora_data %>% summarise(across(all_of(env_vars), ~ mean(!is.na(.x)))), width = Inf)
 
-# Complete-case counts under different variable combinations, to see
-# which predictors are the real bottleneck before committing to a formula
 cat("\nComplete cases - all 7 variables:\n")
 print(eurytemora_data %>% drop_na(all_of(env_vars)) %>% nrow())
 
@@ -68,10 +71,6 @@ print(eurytemora_data %>% drop_na(X2, Final_Temperature, Final_SalSurf) %>% nrow
 ##################################################################
 ## PART 3 — Year-by-year retention check
 ##################################################################
-# Confirms WHY coverage is low for some variables: era-dependent
-# instrumentation changes, not random missingness. Compares the full
-# per-year row count against the per-year count retained under each
-# variable-inclusion scenario.
 
 full_years <- eurytemora_data %>% count(Year) %>% rename(n_full = n)
 
@@ -95,14 +94,37 @@ year_compare <- full_years %>%
 
 cat("\nPer-year retention, Chl-inclusive vs Turbidity-inclusive subsets:\n")
 print(year_compare, n = Inf)
-# Confirmed pattern: Chl is well-covered 1975-1993, drops sharply 2005-2018,
-# partially recovers 2019-2021. Turbidity is entirely absent pre-1994,
-# then becomes well-covered from ~2010 onward. This is why the data is
-# split into pre-1994 / post-2004 eras below, using different predictor
-# sets appropriate to each era's actual instrumentation.
 
 ##################################################################
-## PART 4 — Split into pre-1994 and post-2004 eras
+## PART 4 — Lag-Chl helper function (defined once, used later)
+##################################################################
+
+add_lagged_chl <- function(data, lag_days) {
+  
+  dt <- as.data.table(data)
+  dt[, row_id := .I]
+  
+  chl_lookup <- dt[!is.na(Final_Chl), .(Channel_Station, Date, Final_Chl)]
+  setkey(chl_lookup, Channel_Station, Date)
+  
+  dt[, target_date := Date - lag_days]
+  setkey(dt, Channel_Station, target_date)
+  
+  joined <- chl_lookup[dt, on = .(Channel_Station, Date = target_date),
+                       roll = TRUE,
+                       .(row_id, i.Date, Channel_Station,
+                         Final_Chl_lag = x.Final_Chl)]
+  
+  setnames(joined, "i.Date", "Date")
+  setorder(joined, row_id)
+  
+  out <- data
+  out$Final_Chl_lag <- joined$Final_Chl_lag[match(seq_len(nrow(out)), joined$row_id)]
+  out
+}
+
+##################################################################
+## PART 5 — Split into pre-1994 and post-2004 eras
 ##################################################################
 
 eurytemora_pre1994 <- eurytemora_data %>%
@@ -120,29 +142,131 @@ cat("\nPost-2004 rows:\n"); print(nrow(eurytemora_post2004))
 cat("Post-2004 years:\n"); print(range(as.numeric(as.character(eurytemora_post2004$Year))))
 
 ##################################################################
-## PART 5 — Within-era coverage (confirms era-specific predictor sets)
+## PART 6 — Apply chosen 4-week (28-day) Chl lag, both eras
+##################################################################
+# NOTE: a common-N model-selection comparison (AIC/REML/dev_expl on
+# lags 0-140 days, all fit to an identical row set) found lag=0
+# outperformed every tested lag, with no dip near 28 days. This
+# 28-day lag is applied per an explicit deliberate decision, not
+# because model selection favored it. See PART 14/15 below for a
+# full 0-lag comparison model + figure, fit and plotted the same way.
+
+eurytemora_pre1994 <- add_lagged_chl(eurytemora_pre1994, lag_days = 28) %>%
+  rename(Final_Chl_lag28 = Final_Chl_lag)
+
+cat("\nRows with valid 28-day lagged Chl, pre-1994:\n")
+print(sum(!is.na(eurytemora_pre1994$Final_Chl_lag28)))
+cat("(vs. contemporaneous Chl non-NA count:\n")
+print(sum(!is.na(eurytemora_pre1994$Final_Chl)))
+cat(")\n")
+
+eurytemora_post2004 <- add_lagged_chl(eurytemora_post2004, lag_days = 28) %>%
+  rename(Final_Chl_lag28 = Final_Chl_lag)
+
+cat("\nRows with valid 28-day lagged Chl, post-2004:\n")
+print(sum(!is.na(eurytemora_post2004$Final_Chl_lag28)))
+cat("(vs. contemporaneous Chl non-NA count:\n")
+print(sum(!is.na(eurytemora_post2004$Final_Chl)))
+cat(")\n")
+
+##################################################################
+## PART 7 — Within-era coverage
 ##################################################################
 
 cat("\nCoverage, pre-1994:\n")
 print(eurytemora_pre1994 %>% summarise(across(all_of(env_vars), ~ mean(!is.na(.x)))), width = Inf)
-# Confirmed: Final_Turbidity, Final_DO, Final_pH are all 0% pre-1994.
-# Not a sample-size tradeoff - these instruments did not exist yet in
-# this era. Pre-1994 model therefore uses X2, Temperature, Chl, SalSurf only.
 
 cat("\nCoverage, post-2004:\n")
 print(eurytemora_post2004 %>% summarise(across(all_of(env_vars), ~ mean(!is.na(.x)))), width = Inf)
 
 cat("\nPost-2004 complete cases, all four (Chl+Turbidity+DO+pH):\n")
 print(eurytemora_post2004 %>% drop_na(all_of(env_vars)) %>% nrow())
-# DECISION: include all four despite reduced N (documented limitation),
-# per full predictor-set priority over sample size for this analysis.
 
 ##################################################################
-## PART 6 — LM sanity check
+## PART 7B — Re-check complete-case tradeoffs for post-2004,
+## using the LAGGED Chl variable
 ##################################################################
-# Not the final model - a quick linear pass to confirm predictor
-# directions make sense and to visually demonstrate why a Tweedie GAM
-# (not a Gaussian LM) is appropriate for this right-skewed CPUE response.
+
+cat("\nPost-2004 complete cases - all four (Chl_lag28+Turbidity+DO+pH):\n")
+print(eurytemora_post2004 %>%
+        drop_na(X2, Final_Temperature, Final_Chl_lag28, Final_Turbidity,
+                Final_DO, Final_pH, Final_SalSurf) %>% nrow())
+
+cat("\nPost-2004 complete cases - drop DO/pH only:\n")
+print(eurytemora_post2004 %>%
+        drop_na(X2, Final_Temperature, Final_Chl_lag28, Final_Turbidity,
+                Final_SalSurf) %>% nrow())
+
+cat("\nPost-2004 complete cases - drop DO/pH, drop Turbidity too:\n")
+print(eurytemora_post2004 %>%
+        drop_na(X2, Final_Temperature, Final_Chl_lag28, Final_SalSurf) %>% nrow())
+
+cat("\nPost-2004 complete cases - drop Chl_lag28, keep Turbidity+DO+pH:\n")
+print(eurytemora_post2004 %>%
+        drop_na(X2, Final_Temperature, Final_Turbidity, Final_DO,
+                Final_pH, Final_SalSurf) %>% nrow())
+
+###################################################################
+## PART 8 — ASSIGN EDSM STRATA
+##################################################################
+
+data("R_EDSM_Strata_1718P1")
+
+# ================================================================
+# PRE-1994
+# ================================================================
+
+eurytemora_sf <- eurytemora_pre1994 %>%
+  filter(!is.na(Latitude), !is.na(Longitude)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
+
+eurytemora_sf <- st_transform(eurytemora_sf, st_crs(R_EDSM_Strata_1718P1))
+
+eurytemora_sf <- st_join(
+  eurytemora_sf,
+  R_EDSM_Strata_1718P1 %>% select(Stratum),
+  join = st_within,
+  left = TRUE
+)
+
+eurytemora_pre1994 <- eurytemora_sf %>%
+  st_drop_geometry() %>%
+  mutate(R_EDSM_Strata_1718P1 = factor(Stratum)) %>%
+  select(-Stratum)
+
+cat("\nPre-1994 EDSM strata coverage:\n")
+print(mean(!is.na(eurytemora_pre1994$R_EDSM_Strata_1718P1)))
+print(table(eurytemora_pre1994$R_EDSM_Strata_1718P1, useNA = "ifany"))
+
+# ================================================================
+# POST-2004
+# ================================================================
+
+eurytemora_post2004_sf <- eurytemora_post2004 %>%
+  filter(!is.na(Latitude), !is.na(Longitude)) %>%
+  st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
+
+eurytemora_post2004_sf <- st_transform(eurytemora_post2004_sf, st_crs(R_EDSM_Strata_1718P1))
+
+eurytemora_post2004_sf <- st_join(
+  eurytemora_post2004_sf,
+  R_EDSM_Strata_1718P1 %>% select(Stratum),
+  join = st_within,
+  left = TRUE
+)
+
+eurytemora_post2004 <- eurytemora_post2004_sf %>%
+  st_drop_geometry() %>%
+  mutate(R_EDSM_Strata_1718P1 = factor(Stratum)) %>%
+  select(-Stratum)
+
+cat("\nPost-2004 EDSM strata coverage:\n")
+print(mean(!is.na(eurytemora_post2004$R_EDSM_Strata_1718P1)))
+print(table(eurytemora_post2004$R_EDSM_Strata_1718P1, useNA = "ifany"))
+
+##################################################################
+## PART 9 — LM sanity check
+##################################################################
 
 lm_pre1994 <- lm(
   CPUE ~ X2 + Final_Temperature + Final_Chl + Final_SalSurf + Month_num + Year,
@@ -159,7 +283,7 @@ summary(lm_post2004)
 par(mfrow = c(2, 2)); plot(lm_post2004); par(mfrow = c(1, 1))
 
 ##################################################################
-## PART 7 — Outlier / extreme-value check (pre-1994)
+## PART 10 — Outlier / extreme-value check (pre-1994)
 ##################################################################
 
 cat("\nTop 10 largest CPUE values, pre-1994:\n")
@@ -169,44 +293,32 @@ print(
     select(Date, Channel_Station, CPUE, X2, Final_Chl, Final_Temperature, Final_SalSurf) %>%
     slice(1:10)
 )
-# Checked: extreme values cluster in Apr-Jun and Nov (real seasonal pulse
-# windows for Eurytemora), not random - consistent with genuine bloom
-# events rather than data-entry errors. No exclusions warranted.
 
-cat("\nCPUE by Chl-missingness (checking whether missing Chl skews toward high catches):\n")
+cat("\nCPUE by Chl-missingness:\n")
 print(
   eurytemora_pre1994 %>%
     mutate(chl_missing = is.na(Final_Chl)) %>%
     group_by(chl_missing) %>%
     summarise(mean_cpue = mean(CPUE, na.rm = TRUE), median_cpue = median(CPUE, na.rm = TRUE), n = n())
 )
-# Checked: means/medians are close between groups (571 vs 616; 21.6 vs
-# 26.9) - Chl missingness is not meaningfully tied to catch size.
 
 ##################################################################
-## PART 8 — GAMs
+## PART 11 — GAMs (28-day lagged Chl + EDSM strata)
 ##################################################################
-##################################################################
-## Pre-1994 GAM — FINAL
-## X2 at moderate k=15 (extensively tested up to k=150; edf never
-## stabilized below ceiling due to structural concurvity between X2
-## and calendar time - not a basis-dimension problem, documented as
-## a limitation rather than chased further). Year excluded (eta^2
-## with X2 = 0.59, confirmed redundant). Turbidity/DO/pH excluded -
-## genuinely unavailable pre-1994 (0% coverage), not a tradeoff.
-##################################################################
+
 eurytemora_pre1994 <- eurytemora_pre1994 %>%
   mutate(Channel_Station = factor(Channel_Station))
 
-class(eurytemora_pre1994$Channel_Station)   # confirm it's now "factor"
+class(eurytemora_pre1994$Channel_Station)
 
 gam_eurytemora_pre1994_final <- gam(
   CPUE ~ s(X2, k = 15) +
     s(Final_Temperature, k = 8) +
-    s(Final_Chl, k = 12) +
+    s(Final_Chl_lag28, k = 12) +
     s(Final_SalSurf, k = 15) +
     s(Month_num, bs = "cc", k = 10) +
-    s(Channel_Station, bs = "re"),
+    s(Channel_Station, bs = "re") +
+    s(R_EDSM_Strata_1718P1, bs = "re"),
   family = tw(),
   method = "REML",
   data = eurytemora_pre1994,
@@ -217,34 +329,49 @@ summary(gam_eurytemora_pre1994_final)
 gam.check(gam_eurytemora_pre1994_final)
 concurvity(gam_eurytemora_pre1994_final, full = TRUE)
 
-# Residual autocorrelation check
-# (confirmed lag-1 ~0.47-0.48 in prior runs; AR(1) correction via gamm()
-# attempted but rejected - mgcv does not fully support Tweedie + gamm(),
-# confirmed by package warnings and a ~7x unexplained shift in scale
-# estimate. Documented as a limitation instead: standard errors and
-# significance tests likely understate true uncertainty.)
 acf_result_pre1994 <- acf(residuals(gam_eurytemora_pre1994_final), plot = FALSE)
 print(acf_result_pre1994$acf[1:10])
 
 plot(gam_eurytemora_pre1994_final, select = 1, shade = TRUE)
 
+
 ##################################################################
-## Post-2004 GAM — moderate k from the start, Year excluded (same
-## structural reasoning as pre-1994), all four environmental
-## variables included per earlier decision (documented limitation
-## re: reduced complete-case N)
+## PART 11B — POST-2004 GAM
+## Lagged chlorophyll + environmental variables + EDSM strata
 ##################################################################
 
+eurytemora_post2004 <- eurytemora_post2004 %>%
+  mutate(
+    Channel_Station = factor(Channel_Station),
+    R_EDSM_Strata_1718P1 = factor(R_EDSM_Strata_1718P1)
+  )
+
+cat("\nEDSM strata coverage, post-2004:\n")
+print(mean(!is.na(eurytemora_post2004$R_EDSM_Strata_1718P1)))
+print(table(eurytemora_post2004$R_EDSM_Strata_1718P1, useNA = "ifany"))
+
+cat("\nPredictor coverage, post-2004:\n")
+print(
+  colMeans(!is.na(
+    eurytemora_post2004 %>%
+      select(CPUE, X2, Final_Temperature, Final_Chl_lag28, Final_Turbidity,
+             Final_DO, Final_pH, Final_SalSurf, Month_num,
+             Channel_Station, R_EDSM_Strata_1718P1)
+  ))
+)
+
 gam_eurytemora_post2004_final <- gam(
-  CPUE ~ s(X2, k = 15) +
+  CPUE ~
+    s(X2, k = 15) +
     s(Final_Temperature, k = 8) +
-    s(Final_Chl, k = 10) +
+    s(Final_Chl_lag28, k = 10) +
     s(Final_Turbidity, k = 10) +
     s(Final_DO, k = 8) +
     s(Final_pH, k = 8) +
     s(Final_SalSurf, k = 15) +
     s(Month_num, bs = "cc", k = 10) +
-    s(Channel_Station, bs = "re"),
+    s(Channel_Station, bs = "re") +
+    s(R_EDSM_Strata_1718P1, bs = "re"),
   family = tw(),
   method = "REML",
   data = eurytemora_post2004,
@@ -255,221 +382,411 @@ summary(gam_eurytemora_post2004_final)
 gam.check(gam_eurytemora_post2004_final)
 concurvity(gam_eurytemora_post2004_final, full = TRUE)
 
-# Residual autocorrelation check, same as pre-1994
 acf_result_post2004 <- acf(residuals(gam_eurytemora_post2004_final), plot = FALSE)
 print(acf_result_post2004$acf[1:10])
 
 
-
-
-
-
-
 ##################################################################
-## PART 9- PRESENTATION-READY X2 GAM PLOT
-##################################################################
-
-quantile(eurytemora_pre1994$Final_Chl, probs = c(0.9, 0.95, 0.99), na.rm = TRUE)
-quantile(eurytemora_pre1994$Final_SalSurf, probs = c(0.9, 0.95, 0.99), na.rm = TRUE)
-quantile(eurytemora_pre1994$X2, probs = c(0.01, 0.05, 0.95, 0.99), na.rm = TRUE)
-
-
-gam_eurytemora_pre1994_plot <- gam(
-  CPUE ~ 
-    s(X2, k = 30) +
-    s(Final_Temperature, k = 8) +
-    s(Final_Chl, k = 12) +
-    s(Final_SalSurf, k = 15) +
-    s(Month_num, bs = "cc", k = 10) +
-    s(Channel_Station, bs = "re"),
-  family = tw(),
-  method = "REML",
-  data = eurytemora_pre1994,
-  knots = list(Month_num = c(0.5, 12.5))
-)
-
-gam.check(gam_eurytemora_pre1994_plot)
-
+## PART 12 — PRESENTATION-READY GAM SMOOTH PLOTS (28-day lag, pre-1994)
+#################################################################
 
 library(mgcv)
 library(ggplot2)
 library(dplyr)
 library(patchwork)
 
-# Get model predictions for each smooth
-p_x2 <- plot(
-  gam_eurytemora_pre1994_plot,
-  select = 1,
-  shade = TRUE,
-  seWithMean = TRUE,
-  rug = FALSE,
-  pages = 1
-)
-
-p_temp <- plot(
-  gam_eurytemora_pre1994_plot,
-  select = 2,
-  shade = TRUE,
-  seWithMean = TRUE,
-  rug = FALSE,
-  pages = 1
-)
-
-p_chl <- plot(
-  gam_eurytemora_pre1994_plot,
-  select = 3,
-  shade = TRUE,
-  seWithMean = TRUE,
-  rug = FALSE,
-  pages = 1
-)
-
-p_sal <- plot(
-  gam_eurytemora_pre1994_plot,
-  select = 4,
-  shade = TRUE,
-  seWithMean = TRUE,
-  rug = FALSE,
-  pages = 1
-)
-
-p_month <- plot(
-  gam_eurytemora_pre1994_plot,
-  select = 5,
-  shade = TRUE,
-  seWithMean = TRUE,
-  rug = FALSE,
-  pages = 1
-)
-
-get_smooth_data <- function(model, smooth_number, x_name, x_label) {
+get_smooth_data <- function(model, variable, label, n = 200) {
   
-  pred <- plot(
-    model,
-    se = TRUE,
-    n = 200,
-    plot = FALSE
+  model_data <- model$model
+  
+  x_values <- seq(
+    min(model_data[[variable]], na.rm = TRUE),
+    max(model_data[[variable]], na.rm = TRUE),
+    length.out = n
   )
   
-  # FIX: plot(..., plot = FALSE) always returns ALL smooth terms in the
-  # model, regardless of `select` - select only affects what gets drawn
-  # when actually plotting to a device. Previously this always indexed
-  # pred[[1]] (the X2 term), so every panel silently plotted X2's curve
-  # under a different label. Index by smooth_number to get the correct term.
-  term_data <- pred[[smooth_number]]
+  newdata <- data.frame(
+    X2 = median(model_data$X2, na.rm = TRUE),
+    Final_Temperature = median(model_data$Final_Temperature, na.rm = TRUE),
+    Final_Chl_lag28 = median(model_data$Final_Chl_lag28, na.rm = TRUE),
+    Final_SalSurf = median(model_data$Final_SalSurf, na.rm = TRUE),
+    Month_num = 6,
+    Channel_Station = model_data$Channel_Station[1],
+    R_EDSM_Strata_1718P1 = model_data$R_EDSM_Strata_1718P1[1]
+  )
+  
+  newdata <- newdata[rep(1, length(x_values)), ]
+  newdata[[variable]] <- x_values
+  
+  pred <- predict(model, newdata = newdata, type = "terms", se.fit = TRUE)
+  
+  term_name <- paste0("s(", variable, ")")
+  term_index <- which(colnames(pred$fit) == term_name)
+  
+  fit <- pred$fit[, term_index]
+  se <- pred$se.fit[, term_index]
   
   data.frame(
-    x = term_data$x,
-    fit = term_data$fit,
-    se = term_data$se,
-    x_label = x_label
-  ) %>%
-    mutate(
-      upper = fit + 1.96 * se,
-      lower = fit - 1.96 * se
-    )
+    x = x_values, fit = fit, se = se,
+    lower = fit - 1.96 * se, upper = fit + 1.96 * se,
+    variable = label
+  )
 }
 
-# Extract each smooth
-d_x2 <- get_smooth_data(
-  gam_eurytemora_pre1994_plot,
-  1,
-  "X2",
-  "Location"
-)
-
-d_temp <- get_smooth_data(
-  gam_eurytemora_pre1994_plot,
-  2,
-  "Final_Temperature",
-  "Temperature (°C)"
-)
-
-d_chl <- get_smooth_data(
-  gam_eurytemora_pre1994_plot,
-  3,
-  "Final_Chl",
-  "Chlorophyll-a"
-)
-
-d_sal <- get_smooth_data(
-  gam_eurytemora_pre1994_plot,
-  4,
-  "Final_SalSurf",
-  "Surface salinity"
-)
-
-d_month <- get_smooth_data(
-  gam_eurytemora_pre1994_plot,
-  5,
-  "Month_num",
-  "Month"
-)
+d_x2 <- get_smooth_data(gam_eurytemora_pre1994_final, "X2", "Location")
+d_temp <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_Temperature", "Temperature")
+d_chl <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_Chl_lag28", "Chlorophyll-a")
+d_sal <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_SalSurf", "Surface salinity")
+d_month <- get_smooth_data(gam_eurytemora_pre1994_final, "Month_num", "Season")
 
 make_gam_plot <- function(dat, title, xlab) {
   
   ggplot(dat, aes(x = x, y = fit)) +
-    
-    geom_ribbon(
-      aes(ymin = lower, ymax = upper),
-      alpha = 0.20
-    ) +
-    
-    geom_hline(
-      yintercept = 0,
-      linetype = "dashed",
-      linewidth = 0.5
-    ) +
-    
-    geom_line(
-      linewidth = 1.2
-    ) +
-    
-    labs(
-      title = title,
-      x = xlab,
-      y = "Effect on log(CPUE)"
-    ) +
-    
+    geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.20) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
+    geom_line(linewidth = 1.2) +
+    labs(title = title, x = xlab, y = "Effect on log(CPUE)") +
     theme_classic(base_size = 14) +
-    
     theme(
-      plot.title = element_text(
-        face = "bold",
-        size = 15
-      ),
-      axis.title = element_text(
-        face = "bold"
-      ),
-      axis.text = element_text(
-        color = "black"
-      ),
-      plot.margin = margin(
-        10, 10, 10, 10
-      )
+      plot.title = element_text(face = "bold", size = 15),
+      axis.title = element_text(face = "bold"),
+      axis.text = element_text(color = "black"),
+      plot.margin = margin(10, 10, 10, 10)
     )
 }
 
+g_x2 <- make_gam_plot(d_x2, "Location", "X2 position")
+g_temp <- make_gam_plot(d_temp, "Temperature", "Temperature (°C)")
+g_chl <- make_gam_plot(d_chl, "Chlorophyll-a", "28-day lagged chlorophyll-a")
+g_sal <- make_gam_plot(d_sal, "Surface salinity", "Surface salinity")
+g_month <- make_gam_plot(d_month, "Season", "Month")
 
-g_x2 <- make_gam_plot(d_x2, "Location", "Spatial gradient (X2)") +
-  coord_cartesian(xlim = c(44, 96))
+gam_figure <- (
+  g_x2 | g_temp | g_chl
+) / (
+  g_sal | g_month
+)
 
-g_chl <- make_gam_plot(d_chl, "Chlorophyll-a", "Chlorophyll-a") +
-  coord_cartesian(xlim = c(0, 36))
-
-g_sal <- make_gam_plot(d_sal, "Surface salinity", "Surface salinity") +
-  coord_cartesian(xlim = c(0, 16.5))
-
-final_gam_figure <-
-  (g_x2 | g_temp | g_chl) /
-  (g_sal | g_month | plot_spacer()) +
+# FIX: this figure previously printed with no overall title/subtitle,
+# unlike the post-2004 figure in Part 13 - added plot_annotation here
+# for consistency across both era figures.
+gam_figure +
   plot_annotation(
-    title = "Environmental drivers of Eurytemora abundance",
-    subtitle = "GAM-estimated partial effects, pre-1994"
-  ) &
-  theme(
-    plot.title = element_text(size = 22, face = "bold"),
-    plot.subtitle = element_text(size = 15)
+    title = "Eurytemora GAM relationships — Pre-1994 period",
+    subtitle = "1975–1993 (28-day lagged chlorophyll-a)"
   )
 
-final_gam_figure
+
+##################################################################
+## PART 13 — PRESENTATION-READY POST-2004 GAM SMOOTH PLOTS (28-day lag)
+##################################################################
+
+library(mgcv)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+get_post2004_smooth_data <- function(model, variable, label, n = 200) {
+  
+  model_data <- model$model
+  
+  x_values <- seq(
+    min(model_data[[variable]], na.rm = TRUE),
+    max(model_data[[variable]], na.rm = TRUE),
+    length.out = n
+  )
+  
+  newdata <- data.frame(
+    X2 = median(model_data$X2, na.rm = TRUE),
+    Final_Temperature = median(model_data$Final_Temperature, na.rm = TRUE),
+    Final_Chl_lag28 = median(model_data$Final_Chl_lag28, na.rm = TRUE),
+    Final_Turbidity = median(model_data$Final_Turbidity, na.rm = TRUE),
+    Final_DO = median(model_data$Final_DO, na.rm = TRUE),
+    Final_pH = median(model_data$Final_pH, na.rm = TRUE),
+    Final_SalSurf = median(model_data$Final_SalSurf, na.rm = TRUE),
+    Month_num = 6,
+    Channel_Station = model_data$Channel_Station[1],
+    R_EDSM_Strata_1718P1 = model_data$R_EDSM_Strata_1718P1[1]
+  )
+  
+  newdata <- newdata[rep(1, length(x_values)), ]
+  newdata[[variable]] <- x_values
+  
+  pred <- predict(model, newdata = newdata, type = "terms", se.fit = TRUE)
+  
+  term_name <- paste0("s(", variable, ")")
+  term_index <- which(colnames(pred$fit) == term_name)
+  
+  fit <- pred$fit[, term_index]
+  se <- pred$se.fit[, term_index]
+  
+  data.frame(
+    x = x_values, fit = fit, se = se,
+    lower = fit - 1.96 * se, upper = fit + 1.96 * se,
+    variable = label
+  )
+}
+
+d_x2_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "X2", "Location")
+d_temp_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_Temperature", "Temperature")
+d_chl_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_Chl_lag28", "Chlorophyll-a")
+d_turb_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_Turbidity", "Turbidity")
+d_do_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_DO", "Dissolved oxygen")
+d_ph_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_pH", "pH")
+d_sal_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Final_SalSurf", "Surface salinity")
+d_month_post <- get_post2004_smooth_data(gam_eurytemora_post2004_final, "Month_num", "Season")
+
+make_post2004_gam_plot <- function(dat, title, xlab) {
+  
+  ggplot(dat, aes(x = x, y = fit)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.20) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
+    geom_line(linewidth = 1.2) +
+    labs(title = title, x = xlab, y = "Effect on log(CPUE)") +
+    theme_classic(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 15),
+      axis.title = element_text(face = "bold"),
+      axis.text = element_text(color = "black"),
+      plot.margin = margin(10, 10, 10, 10)
+    )
+}
+
+g_x2_post <- make_post2004_gam_plot(d_x2_post, "Location", "X2 position")
+g_temp_post <- make_post2004_gam_plot(d_temp_post, "Temperature", "Temperature (°C)")
+g_chl_post <- make_post2004_gam_plot(d_chl_post, "Chlorophyll-a", "28-day lagged chlorophyll-a")
+g_turb_post <- make_post2004_gam_plot(d_turb_post, "Turbidity", "Turbidity")
+g_do_post <- make_post2004_gam_plot(d_do_post, "Dissolved oxygen", "Dissolved oxygen")
+g_ph_post <- make_post2004_gam_plot(d_ph_post, "pH", "pH")
+g_sal_post <- make_post2004_gam_plot(d_sal_post, "Surface salinity", "Surface salinity")
+g_month_post <- make_post2004_gam_plot(d_month_post, "Season", "Month")
+
+gam_figure_post2004 <- (
+  g_x2_post | g_temp_post | g_chl_post | g_turb_post
+) / (
+  g_do_post | g_ph_post | g_sal_post | g_month_post
+)
+
+gam_figure_post2004 +
+  plot_annotation(
+    title = "Eurytemora GAM relationships — Post-2004 period",
+    subtitle = "2005–present (28-day lagged chlorophyll-a)"
+  )
+
+
+##################################################################
+## PART 14 — ZERO-LAG (CONTEMPORANEOUS) CHLOROPHYLL GAMs
+## Same model structure as Part 11/11B, but using same-day Final_Chl
+## instead of Final_Chl_lag28. This is the direct comparison case:
+## the common-N model-selection test (documented in Part 6) found
+## lag = 0 outperformed every tested lag on AIC/REML/deviance
+## explained, so these models represent the data-preferred version
+## alongside the 28-day-lag models fit above.
+##################################################################
+
+# ================================================================
+# Pre-1994, zero-lag Chl
+# ================================================================
+
+gam_eurytemora_pre1994_lag0 <- gam(
+  CPUE ~ s(X2, k = 15) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 12) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
+    s(Channel_Station, bs = "re") +
+    s(R_EDSM_Strata_1718P1, bs = "re"),
+  family = tw(),
+  method = "REML",
+  data = eurytemora_pre1994,
+  knots = list(Month_num = c(0.5, 12.5))
+)
+
+cat("\n=== Pre-1994, ZERO-LAG Chl model ===\n")
+summary(gam_eurytemora_pre1994_lag0)
+gam.check(gam_eurytemora_pre1994_lag0)
+concurvity(gam_eurytemora_pre1994_lag0, full = TRUE)
+
+# ================================================================
+# Post-2004, zero-lag Chl
+# ================================================================
+
+cat("\nStarting reduced Post-2004 zero-lag GAM...\n")
+flush.console()
+
+gam_eurytemora_post2004_lag0_test <- mgcv::gam(
+  CPUE ~
+    s(X2, k = 15) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 10) +
+    s(Final_Turbidity, k = 10) +
+    s(Final_DO, k = 8) +
+    s(Final_pH, k = 8) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
+    s(R_EDSM_Strata_1718P1, bs = "re"),
+  family = mgcv::tw(),
+  method = "REML",
+  data = post2004_complete,
+  knots = list(Month_num = c(0.5, 12.5)),
+  control = mgcv::gam.control(trace = TRUE)
+)
+
+cat("\nFinished reduced Post-2004 zero-lag GAM.\n")
+flush.console()
+
+print(summary(gam_eurytemora_post2004_lag0_test))
+
+
+gam_eurytemora_post2004_lag0 <- mgcv::gam(
+  CPUE ~
+    s(X2, k = 15) +
+    s(Final_Temperature, k = 8) +
+    s(Final_Chl, k = 10) +
+    s(Final_Turbidity, k = 10) +
+    s(Final_DO, k = 8) +
+    s(Final_pH, k = 8) +
+    s(Final_SalSurf, k = 15) +
+    s(Month_num, bs = "cc", k = 10) +
+    s(R_EDSM_Strata_1718P1, bs = "re"),
+  family = mgcv::tw(),
+  method = "REML",
+  data = post2004_complete,
+  knots = list(Month_num = c(0.5, 12.5)),
+  control = mgcv::gam.control(trace = TRUE)
+)
+
+summary(gam_eurytemora_post2004_lag0)
+gam.check(gam_eurytemora_post2004_lag0)
+concurvity(gam_eurytemora_post2004_lag0, full = TRUE)
+
+
+
+##################################################################
+## PART 15 — PRESENTATION-READY GAM SMOOTH PLOTS: ZERO-LAG MODELS
+## Uses a generic smooth-extraction function (builds newdata from
+## whatever columns the model actually used, rather than hardcoding
+## column names) so the same function works for both eras and for
+## any future model without editing the function itself.
+##################################################################
+
+get_smooth_data_generic <- function(model, variable, label, n = 200) {
+  
+  model_data <- model$model
+  response_name <- all.vars(formula(model))[1]
+  predictor_cols <- setdiff(names(model_data), response_name)
+  
+  x_values <- seq(
+    min(model_data[[variable]], na.rm = TRUE),
+    max(model_data[[variable]], na.rm = TRUE),
+    length.out = n
+  )
+  
+  # Build a representative row: median for numeric columns, first
+  # observed level for factor columns - then repeat it once per x value.
+  rep_row <- lapply(model_data[predictor_cols], function(col) {
+    if (is.numeric(col)) median(col, na.rm = TRUE) else col[1]
+  })
+  newdata <- as.data.frame(rep_row, stringsAsFactors = FALSE)
+  newdata <- newdata[rep(1, length(x_values)), , drop = FALSE]
+  
+  # Hold month at a representative mid-year value unless month is
+  # itself the focal variable being swept.
+  if ("Month_num" %in% names(newdata) && variable != "Month_num") {
+    newdata$Month_num <- 6
+  }
+  
+  newdata[[variable]] <- x_values
+  
+  pred <- predict(model, newdata = newdata, type = "terms", se.fit = TRUE)
+  
+  term_name <- paste0("s(", variable, ")")
+  term_index <- which(colnames(pred$fit) == term_name)
+  
+  fit <- pred$fit[, term_index]
+  se <- pred$se.fit[, term_index]
+  
+  data.frame(
+    x = x_values, fit = fit, se = se,
+    lower = fit - 1.96 * se, upper = fit + 1.96 * se,
+    variable = label
+  )
+}
+
+make_lag0_gam_plot <- function(dat, title, xlab) {
+  
+  ggplot(dat, aes(x = x, y = fit)) +
+    geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.20) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
+    geom_line(linewidth = 1.2) +
+    labs(title = title, x = xlab, y = "Effect on log(CPUE)") +
+    theme_classic(base_size = 14) +
+    theme(
+      plot.title = element_text(face = "bold", size = 15),
+      axis.title = element_text(face = "bold"),
+      axis.text = element_text(color = "black"),
+      plot.margin = margin(10, 10, 10, 10)
+    )
+}
+
+# ================================================================
+# Pre-1994, zero-lag Chl — extract + plot
+# ================================================================
+
+d_x2_lag0 <- get_smooth_data_generic(gam_eurytemora_pre1994_lag0, "X2", "Location")
+d_temp_lag0 <- get_smooth_data_generic(gam_eurytemora_pre1994_lag0, "Final_Temperature", "Temperature")
+d_chl_lag0 <- get_smooth_data_generic(gam_eurytemora_pre1994_lag0, "Final_Chl", "Chlorophyll-a (no lag)")
+d_sal_lag0 <- get_smooth_data_generic(gam_eurytemora_pre1994_lag0, "Final_SalSurf", "Surface salinity")
+d_month_lag0 <- get_smooth_data_generic(gam_eurytemora_pre1994_lag0, "Month_num", "Season")
+
+g_x2_lag0 <- make_lag0_gam_plot(d_x2_lag0, "Location", "X2 position")
+g_temp_lag0 <- make_lag0_gam_plot(d_temp_lag0, "Temperature", "Temperature (°C)")
+g_chl_lag0 <- make_lag0_gam_plot(d_chl_lag0, "Chlorophyll-a (no lag)", "Chlorophyll-a (contemporaneous)")
+g_sal_lag0 <- make_lag0_gam_plot(d_sal_lag0, "Surface salinity", "Surface salinity")
+g_month_lag0 <- make_lag0_gam_plot(d_month_lag0, "Season", "Month")
+
+gam_figure_pre1994_lag0 <- (
+  g_x2_lag0 | g_temp_lag0 | g_chl_lag0
+) / (
+  g_sal_lag0 | g_month_lag0
+)
+
+gam_figure_pre1994_lag0 +
+  plot_annotation(
+    title = "Eurytemora GAM relationships — Pre-1994 period",
+    subtitle = "1975–1993 (0-day lag, contemporaneous chlorophyll-a)"
+  )
+
+# ================================================================
+# Post-2004, zero-lag Chl — extract + plot
+# ================================================================
+
+d_x2_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "X2", "Location")
+d_temp_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_Temperature", "Temperature")
+d_chl_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_Chl", "Chlorophyll-a (no lag)")
+d_turb_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_Turbidity", "Turbidity")
+d_do_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_DO", "Dissolved oxygen")
+d_ph_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_pH", "pH")
+d_sal_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Final_SalSurf", "Surface salinity")
+d_month_post_lag0 <- get_smooth_data_generic(gam_eurytemora_post2004_lag0, "Month_num", "Season")
+
+g_x2_post_lag0 <- make_lag0_gam_plot(d_x2_post_lag0, "Location", "X2 position")
+g_temp_post_lag0 <- make_lag0_gam_plot(d_temp_post_lag0, "Temperature", "Temperature (°C)")
+g_chl_post_lag0 <- make_lag0_gam_plot(d_chl_post_lag0, "Chlorophyll-a (no lag)", "Chlorophyll-a (contemporaneous)")
+g_turb_post_lag0 <- make_lag0_gam_plot(d_turb_post_lag0, "Turbidity", "Turbidity")
+g_do_post_lag0 <- make_lag0_gam_plot(d_do_post_lag0, "Dissolved oxygen", "Dissolved oxygen")
+g_ph_post_lag0 <- make_lag0_gam_plot(d_ph_post_lag0, "pH", "pH")
+g_sal_post_lag0 <- make_lag0_gam_plot(d_sal_post_lag0, "Surface salinity", "Surface salinity")
+g_month_post_lag0 <- make_lag0_gam_plot(d_month_post_lag0, "Season", "Month")
+
+gam_figure_post2004_lag0 <- (
+  g_x2_post_lag0 | g_temp_post_lag0 | g_chl_post_lag0 | g_turb_post_lag0
+) / (
+  g_do_post_lag0 | g_ph_post_lag0 | g_sal_post_lag0 | g_month_post_lag0
+)
+
+gam_figure_post2004_lag0 +
+  plot_annotation(
+    title = "Eurytemora GAM relationships — Post-2004 period",
+    subtitle = "2005–present (0-day lag, contemporaneous chlorophyll-a)"
+  )
