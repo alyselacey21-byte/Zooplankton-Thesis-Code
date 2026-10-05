@@ -84,7 +84,7 @@ map_Cal_Ele
 
 #Adds in ocean
 
-bbox <- st_bbox(california_proj)
+
 xmin <- as.numeric(bbox["xmin"])
 xmax <- as.numeric(bbox["xmax"])
 ymax <- as.numeric(bbox["ymax"])
@@ -528,3 +528,295 @@ map_asian_clam <- tm_shape(ocean_buffer_trimmed, bbox = crop_box) +
 
 map_corbula
 map_asian_clam
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#############################################################
+## BDSC PRESENTATION MAP
+## Sacramento -> Delta -> San Pablo Bay
+## Static satellite-style map with EDSM Strata + San Pablo Bay overlay
+############################################################
+
+library(sf)
+library(maptiles)
+library(terra)
+library(ggplot2)
+library(ggrepel)
+library(ggspatial)
+library(dplyr)
+library(tigris)
+
+options(tigris_use_cache = TRUE)
+
+#-----------------------------------------------------------
+# 1. MAP EXTENT
+#-----------------------------------------------------------
+
+map_extent <- st_bbox(
+  c(
+    xmin = -122.55,
+    xmax = -121.25,
+    ymin = 37.90,
+    ymax = 38.70
+  ),
+  crs = 4326
+)
+
+map_extent_sf <- st_as_sfc(map_extent)
+
+#-----------------------------------------------------------
+# 2. DOWNLOAD SATELLITE BASEMAP
+#-----------------------------------------------------------
+
+satellite <- get_tiles(
+  x = map_extent_sf,
+  provider = "Esri.WorldImagery",
+  zoom = 10,
+  crop = TRUE,
+  project = TRUE
+)
+
+#-----------------------------------------------------------
+# 3. SACRAMENTO
+#-----------------------------------------------------------
+
+sacramento <- st_as_sf(
+  data.frame(
+    name = "Sacramento",
+    lon = -121.4944,
+    lat = 38.5816
+  ),
+  coords = c("lon", "lat"),
+  crs = 4326
+)
+
+#-----------------------------------------------------------
+# 3B. EDSM STRATA
+# Same source as the spatial join used in the GAM script
+# (R_EDSM_Strata_1718P1 from deltamapr) - loaded here purely for
+# display, not for any join/analysis.
+#-----------------------------------------------------------
+
+library(deltamapr)
+data("R_EDSM_Strata_1718P1")
+
+#-----------------------------------------------------------
+# 3C. SAN PABLO BAY (shaded water polygon)
+# Pulled the same way sf_bay was pulled in the earlier tmap script -
+# tigris::area_water() returns NHD water-area polygons per county,
+# each with a FULLNAME attribute. Filtering to FULLNAME == "San Pablo
+# Bay" isolates just that named water body rather than approximating
+# its shape by hand. Bay is split across several county files, so
+# each county is fetched separately and combined.
+#-----------------------------------------------------------
+
+sanpablo_counties <- c("Marin", "Sonoma", "Napa", "Solano", "Contra Costa")
+
+sanpablo_parts <- lapply(sanpablo_counties, function(co) {
+  area_water(state = "CA", county = co, year = 2022)
+})
+
+sanpablo_water <- do.call(rbind, sanpablo_parts) %>%
+  filter(FULLNAME == "San Pablo Bay")
+
+cat("San Pablo Bay polygon parts found:", nrow(sanpablo_water), "\n")
+# If this prints 0, the NHD FULLNAME for this feature may differ
+# slightly (e.g. trailing whitespace or a variant spelling) - in that
+# case, run unique(sanpablo_water_raw$FULLNAME) on the unfiltered
+# rbind() to find the exact string before filtering.
+
+sanpablo_sf <- sanpablo_water %>%
+  st_union() %>%
+  st_as_sf()
+
+#-----------------------------------------------------------
+# 4. WATERWAY LABEL LOCATIONS
+#
+# These are label points only.
+# They do NOT draw artificial river lines over
+# the satellite imagery.
+#-----------------------------------------------------------
+
+waterway_labels <- data.frame(
+  name = c(
+    "Sacramento River",
+    "San Joaquin River",
+    "Mokelumne River",
+    "Suisun Bay",
+    "San Pablo Bay",
+    "Grizzly Bay", 
+    "Napa River"
+  ),
+  lon = c(
+    -121.70,
+    -121.55,
+    -121.48,
+    -122.05,
+    -122.39,
+    -122.03,
+    -122.25
+  ),
+  lat = c(
+    38.25,
+    38.05,
+    38.10,
+    38.08,
+    38.08,
+    38.12,
+    38.10
+  )
+)
+
+waterway_labels <- st_as_sf(
+  waterway_labels,
+  coords = c("lon", "lat"),
+  crs = 4326
+)
+
+#-----------------------------------------------------------
+# 5. TRANSFORM LABELS / STRATA / SAN PABLO BAY TO SATELLITE CRS
+#-----------------------------------------------------------
+
+sacramento <- st_transform(
+  sacramento,
+  crs(satellite)
+)
+
+waterway_labels <- st_transform(
+  waterway_labels,
+  crs(satellite)
+)
+
+strata_sf <- st_transform(
+  R_EDSM_Strata_1718P1,
+  crs(satellite)
+)
+
+sanpablo_sf <- st_transform(
+  sanpablo_sf,
+  crs(satellite)
+)
+
+#-----------------------------------------------------------
+# 6. MAKE MAP
+#-----------------------------------------------------------
+
+delta_map <- ggplot() +
+  
+  # Satellite imagery
+  layer_spatial(satellite) +
+  
+  # EDSM strata - outlined, lightly shaded so imagery still shows
+  # through. Drawn after the basemap but before all labels/markers
+  # so strata boundaries sit under everything else.
+  geom_sf(
+    data = strata_sf,
+    fill = "white",
+    alpha = 0.15,
+    color = "white",
+    linewidth = 0.5
+  ) +
+  
+  # San Pablo Bay - styled to match the strata layer (white outline,
+  # light white shading) rather than a distinct highlight color.
+  geom_sf(
+    data = sanpablo_sf,
+    fill = "white",
+    alpha = 0.15,
+    color = "white",
+    linewidth = 0.5
+  ) +
+  
+  # Sacramento - filled yellow star, black halo layer behind it so it
+  # stays visible against both dark water and light urban imagery.
+  geom_sf_text(
+    data = sacramento,
+    label = "\u2605",
+    size = 9,
+    color = "black"
+  ) +
+  geom_sf_text(
+    data = sacramento,
+    label = "\u2605",
+    size = 8,
+    color = "yellow"
+  ) +
+  
+  # Sacramento label
+  geom_sf_text(
+    data = sacramento,
+    aes(label = name),
+    nudge_y = 9000,
+    size = 5,
+    fontface = "bold",
+    color = "black",
+    check_overlap = TRUE
+  ) +
+  
+  # Waterway labels
+  geom_sf_text(
+    data = waterway_labels,
+    aes(label = name),
+    size = 4,
+    fontface = "bold.italic",
+    color = "black",
+    check_overlap = TRUE
+  ) +
+  
+  # Scale bar
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.2,
+    text_cex = 0.8,
+    line_width = 0.6
+  ) +
+  
+  # North arrow
+  annotation_north_arrow(
+    location = "tr",
+    which_north = "true",
+    style = north_arrow_minimal(
+      text_size = 10
+    )
+  ) +
+  
+  # Map limits
+  coord_sf(
+    xlim = c(
+      st_bbox(st_transform(map_extent_sf, crs(satellite)))["xmin"],
+      st_bbox(st_transform(map_extent_sf, crs(satellite)))["xmax"]
+    ),
+    ylim = c(
+      st_bbox(st_transform(map_extent_sf, crs(satellite)))["ymin"],
+      st_bbox(st_transform(map_extent_sf, crs(satellite)))["ymax"]
+    ),
+    expand = FALSE
+  ) +
+  
+  # Clean presentation theme
+  theme_void() +
+  
+  theme(
+    plot.margin = margin(10, 10, 10, 10),
+    plot.background = element_rect(
+      fill = "white",
+      color = NA
+    )
+  )
+
+# Display
+delta_map
