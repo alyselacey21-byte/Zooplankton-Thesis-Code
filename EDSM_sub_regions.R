@@ -1,20 +1,22 @@
+#------bringing in the data------------------------------------
 options(repos = c(
   sbashevkin = 'https://sbashevkin.r-universe.dev',
   CRAN = 'https://cloud.r-project.org'))
 
-
+#------bringing in the packages------------------------------------
 library("deltamapr")
 library("ggplot2")
 library("sf")
 library("tidyverse")
 
+#------general plot------------------------------------
 ggplot(R_EDSM_Subregions_Mahardja)+
   geom_sf(aes(fill=SubRegion))+
   theme_bw()+
   theme(legend.position="none")
 
 
-
+#------ another plot------------------------------------
 library("ggrepel")
 
 ggplot(R_EDSM_Subregions_Mahardja) +
@@ -29,7 +31,7 @@ ggplot(R_EDSM_Subregions_Mahardja) +
   theme_bw() +
   theme(legend.position = "none")
 
-
+#------more data and packages------------------------------------
 options(repos = c(
   sbashevkin = 'https://sbashevkin.r-universe.dev',
   CRAN = 'https://cloud.r-project.org'))
@@ -41,7 +43,7 @@ library("gridExtra")  # for combining map + table
 library("mgcv")
 
 
-#Just split the key table into two side-by-side halves:
+#------Just split the key table into two side-by-side halves:------------------------------------
 options(repos = c(
     sbashevkin = 'https://sbashevkin.r-universe.dev',
     CRAN = 'https://cloud.r-project.org'))
@@ -103,7 +105,7 @@ grid.arrange(map_plot, grob1, grob2, ncol = 3, widths = c(2.5, 1, 1))
 
 
 
-###########Taking points from Zoop data and plotting them on the edsm subregion mapr###############
+#------Taking points from Zoop data and plotting them on the edsm subregion mapr------------------------------------
 library(tidyverse)
 library(mgcv)
 
@@ -210,7 +212,7 @@ subregions_combined <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion != "San F
 ggplot() + geom_sf(data = subregions_combined, aes(fill = Region), alpha = 0.6) + geom_sf(data = my_points, size = 1, color = "black", alpha = 0.5) + theme_bw() + theme(legend.position = "none") + labs(title = "EDSM Subregions with Sample Locations")
 
 
-
+#------More data, packages, and maps/graphs------------------------------------
 
 library(sf)
 library(dplyr)
@@ -287,7 +289,7 @@ grid.arrange(
 
 
 
-###################attempt at using strata vs. subregions######################
+#------attempt at using strata vs. subregions------------------------------------
 
 ggplot(R_EDSM_Strata_1718P1)+
   geom_sf(aes(fill=Stratum))+
@@ -301,7 +303,7 @@ ggplot() + geom_sf(data = R_EDSM_Strata_1718P1, aes(fill = Stratum), alpha = 0.6
 
 
 
-######################Adding San Pablo Bay ################
+#------Adding San Pablo Bay------------------------------------
 san_pablo <- R_EDSM_Subregions_Mahardja %>% filter(SubRegion == "San Pablo Bay") %>% mutate(Stratum = "San Pablo Bay")  # adds it into the Stratum fill aesthetic
 
 ggplot() +

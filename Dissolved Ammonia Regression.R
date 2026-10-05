@@ -1,6 +1,9 @@
+#------Packages------------------------------------
+
 library(tidyverse)
 library(mgcv)
 
+#------Bringing in the packages------------------------------------
 #set UserAgent
 options(HTTPUserAgent="EDI_CodeGen") 
 infile1 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/1282/3/c1b6ce974a8fbba8752ce5438ca729ee") 

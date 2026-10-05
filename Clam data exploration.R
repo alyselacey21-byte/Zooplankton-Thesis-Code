@@ -1,3 +1,5 @@
+#------Bringing in the data------------------------------------
+
 options(HTTPUserAgent="EDI_CodeGen")
 
 
@@ -37,10 +39,10 @@ library(tidyverse)
 library(mgcv)
 library(lubridate)
 
-#Clams are in the Phylum Mollusca, ID:6730 
+#------Clams are in the Phylum Mollusca, ID:6730------------------------------------
 
 
-#Specifically Asian and Overbite clams
+#------Specifically Asian and Overbite clams------------------------------------
 dt2 %>%
   mutate(Year = year(as.Date(Date))) %>%
   filter(OrganismCode %in% c("6730", "6890")) %>%
@@ -112,7 +114,7 @@ unique(dt2_mollusca$Common_name)
 
 
 
-#Species categorized into general bins 
+#------Species categorized into general bins------------------------------------ 
 
 #####Clams (including macomas, tellin, semele, and other bivalves in the clam family) Amethyst Gemclam, Asian Clam, Asian Semele, Bent-nose Macoma, Brackish-water Corbula, California Lyonsia/sand clam, California Softshell Clam, Cooper Clam, Fingernail Clam, Jacknife Clam, Japanese Littleneck, Macoma, Nuttall Cockle, Ridgebeak Peaclam, Rough Piddock, San Pedro Thraciid, Softshell Clam, Tellin, Transparent Razor, Ubiquitous Peaclam, Unidentified Cardiidae
 ####Mussels Floater Mussel, Golden Mussel, Green Mussel, Mediterranean Mussel, Northern Horse Mussel, Straight Horse Mussel
@@ -122,7 +124,7 @@ unique(dt2_mollusca$Common_name)
 ###Other / Miscellaneous Gastropods Eastern White Slipper Shell, Epitonium, Marine Gastropod, Paperbubble
 
 
-#########Clams top 3
+#------Clams top 3------------------------------------
 
 clam_species_Top <- c("Asian Clam", "Brackish-water Corbula", "Softshell Clam")
 
@@ -144,7 +146,7 @@ ggplot(dt2_clams_top, aes(x = Year, y = total_count, fill = Common_name)) +
     legend.position = "bottom"
   )
 
-#########Clams other 14
+#------Clams other 14------------------------------------
 
 clam_species <- c("Amethyst Gemclam", "Asian Semele", "Bent-nose Macoma", "California Lyonsia/sand clam", "California Softshell Clam",
                   "Cooper Clam", "Fingernail Clam", "Jacknife Clam", "Japanese Littleneck",
@@ -171,7 +173,7 @@ ggplot(dt2_clams, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-#########Mussels
+#------Mussels------------------------------------
 #Just green mussels 
 dt2_green_mussel <- dt2 %>%
   filter(Common_name == "Green Mussel") %>%
@@ -193,7 +195,7 @@ ggplot(dt2_green_mussel, aes(x = Year, y = total_count, fill = Common_name)) +
 
 
 
-#Other 3 species
+#------Other 3 species------------------------------------
 Mussel_species <- c("Floater Mussel", "Golden Mussel", "Mediterranean Mussel", "Northern Horse Mussel", "Straight Horse Mussel")
 
 dt2_mussels <- dt2 %>%
@@ -214,7 +216,7 @@ ggplot(dt2_mussels, aes(x = Year, y = total_count, fill = Common_name)) +
     legend.position = "bottom"
   )
 
-###All mussels
+#------All mussels------------------------------------
 
 #Other 3 species
 Mussel_species_all <- c("Floater Mussel", "Golden Mussel", "Green Mussel", "Mediterranean Mussel", "Northern Horse Mussel", "Straight Horse Mussel")
@@ -240,7 +242,7 @@ ggplot(dt2_mussels_all, aes(x = Year, y = total_count, fill = Common_name)) +
 
 
 
-##########Snails
+#------Snails------------------------------------
 
 Snail_species <- c("California Ancylid", "California Assiminea", "Eastern Mudsnail", "Gyraulus Snail", "Hydrobe Snail", "Menetus Snail", "Pond Snail", "Pouch Snail", "Red-rim Melania Snail", "Two-ridge Rams-horn Snail", "Unidentified Hydrobioidea")
 
@@ -263,7 +265,7 @@ ggplot(dt2_snails, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-##########Slugs and Sea Slugs
+#------Slugs and Sea Slugs------------------------------------
 
 
 Slug_species <- c("Flat Okenia, Sea Slug", "Gastropod, Slug", "Sea Slug")
@@ -287,7 +289,7 @@ ggplot(dt2_slugs, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-#Just Gastropod
+#------Just Gastropod------------------------------------
 
 Slug_species_1 <- c("Gastropod, Slug")
 
@@ -310,7 +312,7 @@ ggplot(dt2_slugs_1, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-#The other two
+#------The other two------------------------------------
 
 Slug_species_2 <- c("Flat Okenia, Sea Slug", "Sea Slug")
 
@@ -332,7 +334,7 @@ ggplot(dt2_slugs_2, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-##########Oysters   
+#------Oysters------------------------------------
 
 Oyster_species <- c("Olympia Oyster")
 
@@ -355,7 +357,7 @@ ggplot(dt2_Oyster, aes(x = Year, y = total_count, fill = Common_name)) +
   )
 
 
-##########Other  Gastropods 
+#------Other  Gastropods------------------------------------
 
 Other_species <- c("Eastern white slipper shell", "Epitonium", "Marine Gastropod", "Paperbubble")
 

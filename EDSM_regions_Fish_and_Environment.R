@@ -1,9 +1,9 @@
-
+#------Bringing in the packages------------------------------------
 library(tidyverse)
 library(mgcv)
 
 
-
+#------Bringing in the data------------------------------------
 ##############Fish###############
 infile1 <- trimws("https://pasta.lternet.edu/package/data/eml/edi/1075/2/5429d3e82b1671e7454c7b5d7a15c6ef") 
 infile1 <-sub("^https","http",infile1)
@@ -200,8 +200,7 @@ ggplot() +
   theme_bw() +
   labs(title = "EDSM Strata with Sample Locations")
 
-
-###################join lat and long dataset with fish dataset################
+#------join lat and long dataset with fish dataset------------------------------------
 
 # Check dt3 loaded correctly
 head(dt3)
@@ -241,7 +240,7 @@ head(delta_smelt)
 
 
 
-###########Only looking at trawls and points with delta smelt############
+#------Only looking at trawls and points with delta smelt------------------------------------
 
 library(deltamapr)
 library(ggplot2)
@@ -292,7 +291,7 @@ ggplot() +
 
 
 
-#########Adding salmonids to the map##########
+#------Adding salmonids to the map------------------------------------
 dt1 %>%
   filter(grepl("salmon|oncorhynchus", Taxa, ignore.case = TRUE)) %>%
   distinct(Taxa)

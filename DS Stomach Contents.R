@@ -1,5 +1,5 @@
 
-
+#------Bringing in the packages------------------------------------
 infile1  <- file("PUT-LOCAL-PATH-TO-DATA-FILE-HERE", open="r")  
 dataTable1 <-read.csv(infile1, 
                       ,sep=","  

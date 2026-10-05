@@ -1,4 +1,4 @@
-#############Packages#########
+#-----Packages------------------------------------
 
 library(tidyverse)
 library(mgcv)
@@ -11,7 +11,7 @@ library(data.table)
 library(geosphere)
 library(wql)
 
-###########Bring in the Zoop, benthic invert, and Tides, datasets ##########
+#-----Bring in the Zoop, benthic invert, and Tides, datasets ------------------------------------
 Zoop_Community <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/zooplankton_community (3).csv")
 
 
@@ -22,7 +22,7 @@ EMP_DWQ <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplank
 Station_Metadata_DWR <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/Station_metadata.csv")
 
 
-####X2, Jersey Point Flow, and total outflows########
+#-----X2, Jersey Point Flow, and total outflows------------------------------------
 dayflow_70_83 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1970-1983.csv")
 
 dayflow_84_96 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1984-1996.csv")
@@ -31,25 +31,23 @@ dayflow_84_96 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zo
 dayflow_97_23 <- read.csv("C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs/dayflow-results-1997-2023.csv")
 
 
-# What are the actual analyte names, and what units come with them?
+#-----What are the actual analyte names, and what units come with them? ------------------------------------
 EMP_DWQ %>%
   count(Analyte, Result_Unit) %>%
   arrange(desc(n))
 
-# How does Sampling_Depth vary within a single visit? (pick one station/date to inspect)
+#-----How does Sampling_Depth vary within a single visit? (pick one station/date to inspect) ------------------------------------
 EMP_DWQ %>%
   filter(Station == "D4", Date == "1975-01-07") %>%
   select(Analyte, Sampling_Depth, Result_Value, Result_Unit)
 
-# Overall shape of Sampling_Depth per analyte, to see if surface/bottom is a clean 2-value split
+#-----Overall shape of Sampling_Depth per analyte, to see if surface/bottom is a clean 2-value split ------------------------------------
 EMP_DWQ %>%
   filter(Analyte %in% c("Water Temperature", "Specific Conductance", "Dissolved Oxygen")) %>%  # adjust names once you see the real list
   count(Analyte, Sampling_Depth) %>%
   arrange(Analyte, Sampling_Depth)
 
-###############################################################
-## PART 1 — DAYFLOW AND X2
-###############################################################
+#----- PART 1 — DAYFLOW AND X2------------------------------------
 
 dayflow_97_23 <- dayflow_97_23 %>%
   rename(
@@ -96,18 +94,15 @@ cat("\nX2 head/tail check:\n")
 print(head(dayflow_clean %>% select(Date, OUT, X2)))
 print(tail(dayflow_clean %>% select(Date, OUT, X2)))
 
-###############################################################
-## PART 2 — HELPER FUNCTIONS & DATA CLEANING
-###############################################################
+#-----PART 2 — HELPER FUNCTIONS & DATA CLEANING------------------------------------
 
 safe_mean <- function(x) {
   if (all(is.na(x))) return(NA_real_)
   mean(x, na.rm = TRUE)
 }
 
-#-----------------------------
 # Standardize Dates
-#-----------------------------
+
 
 Zoop_Community <- Zoop_Community %>%
   mutate(
@@ -127,9 +122,8 @@ EMP_DWQ <- EMP_DWQ %>%
     Year = year(Date)
   )
 
-#-----------------------------
 # Clean station metadata
-#-----------------------------
+
 
 Station_Metadata_DWR <- Station_Metadata_DWR %>%
   mutate(
@@ -139,9 +133,9 @@ Station_Metadata_DWR <- Station_Metadata_DWR %>%
   filter(!is.na(Latitude), !is.na(Longitude)) %>%
   distinct(StationID, .keep_all = TRUE)
 
-#-----------------------------
+
 # Join station coordinates into EMP_DWQ
-#-----------------------------
+
 
 EMP_DWQ <- EMP_DWQ %>%
   left_join(
@@ -149,9 +143,7 @@ EMP_DWQ <- EMP_DWQ %>%
     by = c("Station" = "StationID")
   )
 
-###############################################################
-## PART 3 — COMMON ANALYSIS PERIOD
-###############################################################
+#-----PART 3 — COMMON ANALYSIS PERIOD------------------------------------
 
 analysis_filter <- function(df) {
   df %>%
@@ -171,9 +163,7 @@ cat("\nBenthic years:\n"); print(range(DWR_Benthic$Year))
 cat("\nEMP years:\n"); print(range(EMP_DWQ$Year))
 cat("\nMissing EMP coordinates:\n"); print(sum(is.na(EMP_DWQ$Latitude)))
 
-###############################################################
-## PART 4 — MONTHLY EMP ENVIRONMENT DATA
-###############################################################
+#-----PART 4 — MONTHLY EMP ENVIRONMENT DATA------------------------------------
 # "Turbidity" was reported under two incompatible instrument scales
 # (NTU pre-transition, FNU post-transition) but shared one Analyte label.
 # Without splitting these apart, the group-level mean below would blend
@@ -204,9 +194,7 @@ cat("\nMonthly EMP rows:", nrow(EMP_monthly), "\n")
 cat("\nEMP monthly columns:\n"); print(names(EMP_monthly))
 
 view(EMP_monthly)
-###############################################################
-## PART 5 — BIOLOGICAL DATA
-###############################################################
+#-----PART 5 — BIOLOGICAL DATA------------------------------------
 
 mysid_genera <- c("Alienacanthomysis", "Deltamysis", "Hyperacanthomysis",
                   "Neomysis", "Orientomysis")
@@ -285,9 +273,7 @@ DWR_Benthic_avg <- DWR_Benthic %>%
   )
 view(DWR_Benthic_avg)
 
-###############################################################
-## PART 6 — COMBINE ORGANISMS
-###############################################################
+#-----PART 6 — COMBINE ORGANISMS------------------------------------
 
 organisms_combined <- bind_rows(Zoop_Community_avg, DWR_Benthic_avg) %>%
   mutate(
@@ -295,9 +281,7 @@ organisms_combined <- bind_rows(Zoop_Community_avg, DWR_Benthic_avg) %>%
     Year = year(Date)
   )
 
-###############################################################
-## PART 7 — DAYFLOW JOIN
-###############################################################
+#-----PART 7 — DAYFLOW JOIN------------------------------------
 
 organisms_combined <- organisms_combined %>%
   left_join(
@@ -308,9 +292,7 @@ organisms_combined <- organisms_combined %>%
 cat("\nX2 coverage after Dayflow join:\n")
 print(mean(!is.na(organisms_combined$X2)))
 
-###############################################################
-## PART 8 — MONTHLY EMP JOIN
-###############################################################
+#-----PART 8 — MONTHLY EMP JOIN------------------------------------
 # FIX: explicit suffix argument, so BOTH sides of any name collision
 # (e.g. Turbidity_NTU/pH existing natively in Zoop data AND as EMP
 # analyte-derived columns) get clear, intentional names - not just the
@@ -327,9 +309,7 @@ cat("\nColumns after EMP join:\n")
 print(names(organisms_combined))
 view(organisms_combined)
 
-###############################################################
-## PART 9 — CLEAN VARIABLE NAMES
-###############################################################
+#-----PART 9 — CLEAN VARIABLE NAMES------------------------------------
 # NOTE: column names below assume the EMP analyte strings confirmed
 # earlier ("Water Temperature", "Dissolved Oxygen mg/L", "Chlorophyll a",
 # "Specific Conductance", "Turbidity_NTU"/"Turbidity_FNU"). If PART 4's
@@ -347,9 +327,7 @@ organisms_combined <- organisms_combined %>%
   rename_with(~ "EMP_Turbidity_FNU", .cols = matches("^Turbidity_FNU$"))
 
 
-###############################################################
-## PART 10 — SALINITY CONVERSION + UNIFIED ENVIRONMENTAL VARIABLES
-###############################################################
+#-----PART 10 — SALINITY CONVERSION + UNIFIED ENVIRONMENTAL VARIABLES------------------------------------
 # FIX: EMP reports specific conductance (uS/cm), not salinity directly.
 # Converting here so it's comparable to Zoop's SalSurf/SalBott (which
 # were presumably already derived the same way upstream).
@@ -372,9 +350,7 @@ organisms_combined <- organisms_combined %>%
     Final_SalSurf     = coalesce(SalSurf, EMP_Salinity)
   )
 
-###############################################################
-## PART 11 — DATA COVERAGE
-###############################################################
+#-----PART 11 — DATA COVERAGE------------------------------------
 
 cat("\nEMP-side coverage (raw EMP columns):\n")
 print(colMeans(!is.na(organisms_combined %>%
@@ -387,9 +363,7 @@ print(
     summarise(across(starts_with("Final_"), ~ mean(!is.na(.x))))
 )
 
-###############################################################
-## PART 12 — FINAL CHECKS
-###############################################################
+#-----PART 12 — FINAL CHECKS------------------------------------
 
 cat("\nRows:\n"); print(nrow(organisms_combined))
 cat("\nSources:\n"); print(table(organisms_combined$Source))
@@ -397,9 +371,7 @@ cat("\nMissing CPUE:\n"); print(sum(is.na(organisms_combined$CPUE)))
 cat("\nX2 Coverage:\n"); print(mean(!is.na(organisms_combined$X2)))
 cat("\nDate Range:\n"); print(range(organisms_combined$Date))
 
-###############################################################
-## PART 13 — SAVE
-###############################################################
+#-----PART 13 — SAVE------------------------------------
 
 saveRDS(organisms_combined, "organisms_combined_final.rds")
 write_csv(organisms_combined, "organisms_combined_final.csv")

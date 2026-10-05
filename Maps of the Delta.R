@@ -1,4 +1,6 @@
-#Maps of the Delta
+#-----Maps of the Delta------------------------------------
+
+#-----Packages------------------------------------
 
 install.packages("sf")
 # Always use binary (faster, no prompt)
@@ -35,7 +37,7 @@ library(rnaturalearthhires)
 library(rnaturalearthdata)
 library(tigris)
 
-
+#-----Setting up the map ------------------------------------
 # Get U.S. states geometry
 states <- us_states()
 
@@ -187,7 +189,7 @@ map_cali_delta
 
 
 
-#More precise fill and such. 
+#-----More precise fill and such. ------------------------------------
 
 library(tigris)
 sf_bay <- area_water(state = "CA", county = c("San Francisco", "Marin", "Contra Costa", "Alameda", "Santa Clara", "San Mateo")) |>
@@ -236,13 +238,7 @@ print(map_cali_delta)
 
 
 
-
-
-
-
-
-
-###############Now adding the trawls and unique coordinate points to the map################
+#-----Now adding the trawls and unique coordinate points to the map------------------------------------
 
 inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/539/4/58dd1dde8e38614a9cc48794f527bdec" 
 infile1 <- tempfile()
@@ -342,11 +338,7 @@ map_cali_delta
 
 
 
-
-
-
-
-###############size of the dot depends on how many times a point is trawled#########
+#-----size of the dot depends on how many times a point is trawled------------------------------------
 trawl_unique <- dt1 |>
   filter(!is.na(Latitude), !is.na(Longitude)) |>
   group_by(Latitude, Longitude, Source) |>
@@ -398,7 +390,7 @@ map_cali_delta
 
 
 
-#########Now doing this with the clams 
+#-----Now doing this with the clams ------------------------------------
 
 options(HTTPUserAgent="EDI_CodeGen")
 
@@ -445,7 +437,7 @@ library(lubridate)
 # Split data
 # Filter before converting to sf
 
-#######These maps are not really correct########
+#-----These maps are not really correct------------------------------------
 clam_unique <- dt2 |>
   filter(!is.na(Latitude), !is.na(Longitude)) |>
   filter(Common_name %in% c("Asian Clam", "Brackish-water Corbula")) |>
@@ -531,25 +523,7 @@ map_asian_clam
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#############################################################
-## BDSC PRESENTATION MAP
-## Sacramento -> Delta -> San Pablo Bay
-## Static satellite-style map with EDSM Strata + San Pablo Bay overlay
-############################################################
+#-----BDSC PRESENTATION MAP ## Sacramento -> Delta -> San Pablo Bay ## Static satellite-style map with EDSM Strata + San Pablo Bay overlay------------------------------------
 
 library(sf)
 library(maptiles)
@@ -562,9 +536,7 @@ library(tigris)
 
 options(tigris_use_cache = TRUE)
 
-#-----------------------------------------------------------
-# 1. MAP EXTENT
-#-----------------------------------------------------------
+#----1. MAP EXTENT -----------------------------------------------------------
 
 map_extent <- st_bbox(
   c(
@@ -578,9 +550,7 @@ map_extent <- st_bbox(
 
 map_extent_sf <- st_as_sfc(map_extent)
 
-#-----------------------------------------------------------
-# 2. DOWNLOAD SATELLITE BASEMAP
-#-----------------------------------------------------------
+#-----2. DOWNLOAD SATELLITE BASEMAP-----------------------------------------------------------
 
 satellite <- get_tiles(
   x = map_extent_sf,
@@ -590,9 +560,7 @@ satellite <- get_tiles(
   project = TRUE
 )
 
-#-----------------------------------------------------------
-# 3. SACRAMENTO
-#-----------------------------------------------------------
+#----3. SACRAMENTO -----------------------------------------------------------
 
 sacramento <- st_as_sf(
   data.frame(
@@ -604,25 +572,12 @@ sacramento <- st_as_sf(
   crs = 4326
 )
 
-#-----------------------------------------------------------
-# 3B. EDSM STRATA
-# Same source as the spatial join used in the GAM script
-# (R_EDSM_Strata_1718P1 from deltamapr) - loaded here purely for
-# display, not for any join/analysis.
-#-----------------------------------------------------------
+#----3B. EDSM STRATA # Same source as the spatial join used in the GAM script # (R_EDSM_Strata_1718P1 from deltamapr) - loaded here purely for # display, not for any join/analysis. --------------------------------------------------------
 
 library(deltamapr)
 data("R_EDSM_Strata_1718P1")
 
-#-----------------------------------------------------------
-# 3C. SAN PABLO BAY (shaded water polygon)
-# Pulled the same way sf_bay was pulled in the earlier tmap script -
-# tigris::area_water() returns NHD water-area polygons per county,
-# each with a FULLNAME attribute. Filtering to FULLNAME == "San Pablo
-# Bay" isolates just that named water body rather than approximating
-# its shape by hand. Bay is split across several county files, so
-# each county is fetched separately and combined.
-#-----------------------------------------------------------
+#----3C. SAN PABLO BAY (shaded water polygon) # Pulled the same way sf_bay was pulled in the earlier tmap script - tigris::area_water() returns NHD water-area polygons per county, # each with a FULLNAME attribute. Filtering to FULLNAME == "San Pablo Bay" isolates just that named water body rather than approximating its shape by hand. Bay is split across several county files, so each county is fetched separately and combined. -----------------------------------------------------------
 
 sanpablo_counties <- c("Marin", "Sonoma", "Napa", "Solano", "Contra Costa")
 
@@ -643,13 +598,7 @@ sanpablo_sf <- sanpablo_water %>%
   st_union() %>%
   st_as_sf()
 
-#-----------------------------------------------------------
-# 4. WATERWAY LABEL LOCATIONS
-#
-# These are label points only.
-# They do NOT draw artificial river lines over
-# the satellite imagery.
-#-----------------------------------------------------------
+#-----4. WATERWAY LABEL LOCATIONS # These are label points only. # They do NOT draw artificial river lines over # the satellite imagery. -----------------------------------------------------------
 
 waterway_labels <- data.frame(
   name = c(
@@ -687,9 +636,7 @@ waterway_labels <- st_as_sf(
   crs = 4326
 )
 
-#-----------------------------------------------------------
-# 5. TRANSFORM LABELS / STRATA / SAN PABLO BAY TO SATELLITE CRS
-#-----------------------------------------------------------
+#----5. TRANSFORM LABELS / STRATA / SAN PABLO BAY TO SATELLITE CRS-----------------------------------------------------------
 
 sacramento <- st_transform(
   sacramento,
@@ -711,9 +658,7 @@ sanpablo_sf <- st_transform(
   crs(satellite)
 )
 
-#-----------------------------------------------------------
-# 6. MAKE MAP
-#-----------------------------------------------------------
+#----6. MAKE MAP -----------------------------------------------------------
 
 delta_map <- ggplot() +
   
