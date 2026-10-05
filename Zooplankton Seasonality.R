@@ -1,9 +1,11 @@
 
+
+# ---- Packages ------------------------------------
 library(tidyverse)
 library(mgcv)
 
 
-
+# ---- Bringing in the Data ------------------------------------
 options(HTTPUserAgent="EDI_CodeGen")
 
 
@@ -91,7 +93,7 @@ unlink(infile1)
 head(dt1)
 
 
-
+# ---- Subsetting the Data ------------------------------------
 Zoop1 <- subset(dt1, Year>2004)
 head(Zoop1)
 tail(Zoop1)
@@ -124,7 +126,7 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 
-#Gammarus Genus
+# ---- Gammarus Genus First half of the data------------------------------------
 
 #line and dot plot
 
@@ -289,7 +291,8 @@ ggplot(Zoop8,
   ) +
   theme_bw()
 
-#######################first half of the data#######################
+
+# ---- Gammarus Genus Second half of the data------------------------------------
 
 
 #Gammarus Genus
@@ -458,7 +461,7 @@ ggplot(Zoop107,
   theme_bw()
 
 
-###################Gammarus from bay-delta benthic data######################
+# ---- Gammarus from bay-delta benthic data------------------------------------
 
 library("lubridate")
 
@@ -508,7 +511,7 @@ summary(Gam100)
 
 library(dplyr)
 
-#####################Gam post 2004######################3
+# ----Gam post 2004------------------------------------
 Gam2 <- Gam1 %>%
   filter(Genus == "Gammarus") %>%
   mutate(
@@ -537,7 +540,7 @@ ggplot(Gam2,
 
 
 
-######################Gams pre 1994####################
+# ----Gams pre 1994------------------------------------
 Gam101 <- Gam100 %>%
   filter(Genus == "Gammarus") %>%
   mutate(
@@ -567,7 +570,7 @@ ggplot(Gam101,
 
 
 
-########################zoop genus monthly spatial distribution average old and new #####################
+# ----zoop genus monthly spatial distribution average old and new------------------------------------
 
 target_genera <- c(
   "Gammarus",
@@ -614,17 +617,17 @@ san_pablo <- R_EDSM_Subregions_Mahardja %>%
 strata_boundary <- R_EDSM_Strata_1718P1 %>%
   bind_rows(san_pablo)
 
-# 1. Convert zoop_map to an sf points object (lat/long assumed WGS84)
+# ----1. Convert zoop_map to an sf points object (lat/long assumed WGS84) ------------------------------------
 zoop_sf <- zoop_map %>%
   filter(!is.na(Longitude), !is.na(Latitude)) %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
 
-# 2. Use strata_boundary (includes San Pablo Bay), matched to zoop_sf's CRS
+# ----2. Use strata_boundary (includes San Pablo Bay), matched to zoop_sf's CRS ------------------------------------
 strata <- strata_boundary %>% st_transform(st_crs(zoop_sf))
 
 zoop_strata <- st_join(zoop_sf, strata, join = st_within)
 
-# 3. Summarize mean CPUE by stratum and taxon group
+# ----3. Summarize mean CPUE by stratum and taxon group ------------------------------------
 strata_summary <- zoop_strata %>%
   st_drop_geometry() %>%
   filter(!is.na(Stratum)) %>%
@@ -633,7 +636,7 @@ strata_summary <- zoop_strata %>%
             n = n(),
             .groups = "drop")
 
-# 4a. Bar chart: mean CPUE by stratum, faceted by taxon group
+# ----4a. Bar chart: mean CPUE by stratum, faceted by taxon group ------------------------------------
 ggplot(strata_summary, aes(x = reorder(Stratum, MeanCPUE), y = MeanCPUE, fill = Group)) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ Group, scales = "free_x") +
@@ -642,7 +645,7 @@ ggplot(strata_summary, aes(x = reorder(Stratum, MeanCPUE), y = MeanCPUE, fill = 
   theme_bw()
 
 
-
+# ---- Grids and maps of the genera I am examining ------------------------------------
 
 library(deltamapr)
 library(sf)

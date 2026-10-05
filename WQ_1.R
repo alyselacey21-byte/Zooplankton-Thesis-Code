@@ -1,4 +1,6 @@
 
+
+# ---- Packages ------------------------------------
 WaterQuality <- read.csv("C:/Users/al-la/Downloads/SMSCG_wq_data_2017-2023_clean_tzone.csv")
 head(WaterQuality)
 tail(WaterQuality)
@@ -13,7 +15,7 @@ library(mgcv)
 
 options(HTTPUserAgent="EDI_CodeGen")
 
-
+# ---- bringing in the datasets ------------------------------------
 inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/539/4/58dd1dde8e38614a9cc48794f527bdec" 
 infile1 <- tempfile()
 try(download.file(inUrl1,infile1,method="curl",extra=paste0(' -A "',getOption("HTTPUserAgent"),'"')))
@@ -64,7 +66,7 @@ unlink(infile1)
 head(dt1)
 
 
-#Attempt to remove all years before 2000
+# ---- Attempt to remove all years before 2000 ------------------------------------
 
 head(dt1)
 
@@ -75,29 +77,28 @@ print(IEP2000)
 
 colSums(IEP2000 ==2003 , na.rm = TRUE)
 
-#Attempt Successful, use IEP2000 from here on
+# ---- Attempt Successful, use IEP2000 from here on ------------------------------------
 
 
-#Check the number of unique values in class to see if it is a possible stat representation for Zoops
+# ---- Check the number of unique values in class to see if it is a possible stat representation for Zoops ------------------------------------
 
 length(unique(IEP2000$Class))
 #Only 4 unique values, too zoomed out, I will remove. 
 
 
 
-#I will now be using the first letter of each column for the object name until all rows I want to remove, are removed.
-# Year = "Y" now, pH = "p" now, etc.
+# ---- I will now be using the first letter of each column for the object name until all rows I want to remove, are removed. # Year = "Y" now, pH = "p" now, etc. ------------------------------------
 
-#Now I will attempt to remove columns that I am not using
+# ---- Now I will attempt to remove columns that I am not using ------------------------------------
 
 #Attempt to remove unneeded Columns
 IEP2000_remove <- IEP2000 %>% select(-BottomDepth, -Undersampled, -Taxlifestage, -Lifestage, -Tide, -AmphipodCode, -SalBott, -Species, -Phylum, -Class)
 print(IEP2000_remove)
 
-#Attempt successful, use IEP2000_remove
+# ---- Attempt successful, use IEP2000_remove ------------------------------------
 
 
-#Check the number of unique values in Order, Faimly, and Genus to see if it is a possible stat representation for Zoops
+# ---- Check the number of unique values in Order, Faimly, and Genus to see if it is a possible stat representation for Zoops ------------------------------------
 
 length(unique(IEP2000_remove$Order))
 #Only 6 unique values
@@ -117,11 +118,11 @@ sort(unique(IEP2000_remove$Genus))
 colSums(is.na(IEP2000_remove))
 #Order and Family have 0 NA values, Genus has 9998 NA values 
 
-#I think the best to use is Family for most amount of unique value and least amount of NA colums removes
+# ----I think the best to use is Family for most amount of unique value and least amount of NA colums removes ------------------------------------
 
 
 
-#Checking the amount of 0 values present in each column 
+# ----Checking the amount of 0 values present in each column ------------------------------------
 colSums(IEP2000_remove ==0 , na.rm = TRUE)
 
 #Chl = 370 == 0
@@ -160,7 +161,7 @@ hist(log10(Z_Volume))
 Z_CPUE <- IEP2000_remove$CPUE
 hist(log10(Z_CPUE))
 
-# break the cpue down by taxon and make a graph
+# ---- break the cpue down by taxon and make a graph ------------------------------------
 
 library("tidyverse")
 
@@ -204,7 +205,7 @@ ggplot(IEP2000_remove_NA, aes(x = Genus, y = CPUE, fill = Genus)) +
  #remove NAs from the facet_wrap too
 
 
-#stacked bargraphs
+# ---- stacked bargraphs ------------------------------------
 library("tidyverse")
 library("dplyr")
 library("ggthemes")
@@ -258,7 +259,7 @@ ggplot(dt1_NA, aes(x = Year, y = CPUE, fill = Genus)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 
-#teasing out chlorophyll levels over years
+# ---- teasing out chlorophyll levels over years
 dt1_NA_Chl<- dt1[!is.na(dt1$Chl), ]
 
 ggplot(dt1_NA_Chl, aes(x = log10(Chl))) +
@@ -284,7 +285,7 @@ ggplot(dt1_NA_Chl, aes(x = Year, y = Chl)) +
 
 
 
-#Individual histograms
+# ---- Individual histograms ------------------------------------
 
 
 Acanthocyclops <- "Acanthocyclops"
