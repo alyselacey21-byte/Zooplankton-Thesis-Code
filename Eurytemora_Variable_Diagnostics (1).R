@@ -1,3 +1,89 @@
+
+#Simple histograms of each variable for both time periods for eurytemora samples both pre- and post- 
+
+library(tidyverse)
+library(patchwork)
+
+# ---- Data: Eurytemora, with a numeric year and era ----
+plot_data <- organisms_model_reduced %>%
+  filter(Genus == "Eurytemora") %>%
+  mutate(Year_num = as.numeric(as.character(Year)))
+
+pre_data  <- plot_data %>% filter(Year_num < 1994)
+post_data <- plot_data %>% filter(Year_num > 2004)
+
+plot_vars <- c(
+  CPUE              = "CPUE",
+  X2                = "X2 position (km)",
+  Final_Temperature = "Temperature (deg C)",
+  Final_Chl         = "Chlorophyll-a (ug/L)",
+  Final_DO          = "Dissolved oxygen (mg/L)",
+  Final_pH          = "pH",
+  Final_Turbidity   = "Turbidity (NTU/FNU)",
+  Final_SalSurf     = "Surface salinity (PSU)",
+  Month_num         = "Calendar month (1-12)"
+)
+
+# ---- One page (two panels) for one variable ----
+plot_var_page <- function(df, var, label, era_label, year_range) {
+  
+  # Variable has no data in this era: show a placeholder instead of erroring
+  if (all(is.na(df[[var]]))) {
+    return(
+      ggplot() +
+        annotate("text", x = 0, y = 0, size = 6,
+                 label = paste0(label, ": no data in ", era_label)) +
+        theme_void()
+    )
+  }
+  
+  # Left: histogram of values
+  # (bins = 12 for month so each calendar month gets its own bar)
+  g_hist <- ggplot(df %>% filter(!is.na(.data[[var]])), aes(x = .data[[var]])) +
+    geom_histogram(bins = if (var == "Month_num") 12 else 40,
+                   fill = "grey40", colour = "white") +
+    labs(title = paste0(label, " — distribution"),
+         x = label, y = "Count") +
+    theme_classic(base_size = 13)
+  
+  # Right: non-missing observations per year (zero-filled for empty years)
+  counts <- df %>%
+    group_by(Year_num) %>%
+    summarise(n = sum(!is.na(.data[[var]])), .groups = "drop") %>%
+    complete(Year_num = seq(year_range[1], year_range[2]), fill = list(n = 0))
+  
+  g_year <- ggplot(counts, aes(x = Year_num, y = n)) +
+    geom_col(fill = "steelblue") +
+    scale_x_continuous(breaks = seq(year_range[1], year_range[2], by = 2)) +
+    labs(title = paste0(label, " — observations per year"),
+         x = "Year", y = "Count") +
+    theme_classic(base_size = 13) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  g_hist | g_year
+}
+
+# ---- Make all pages for one era: print to screen and save to PDF ----
+make_era_pages <- function(df, era_label, year_range, file) {
+  pages <- imap(plot_vars, ~ plot_var_page(df, .y, .x, era_label, year_range) +
+                  plot_annotation(title = paste("Eurytemora —", era_label)))
+  walk(pages, print)
+  pdf(file, width = 13, height = 5)
+  walk(pages, print)
+  dev.off()
+  invisible(pages)
+}
+
+make_era_pages(pre_data,  "Pre-1994 (1975–1993)",  c(1975, 1993),
+               "eurytemora_variable_hist_pre1994.pdf")
+make_era_pages(post_data, "Post-2004 (2005–2021)", c(2005, 2021),
+               "eurytemora_variable_hist_post2004.pdf")
+
+
+
+
+
+
 ##################################################################
 ## EURYTEMORA — VARIABLE DISTRIBUTION & CPUE RELATIONSHIP DIAGNOSTICS
 ## For every variable in organisms_model_reduced, look at:

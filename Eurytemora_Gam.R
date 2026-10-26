@@ -43,6 +43,17 @@ cat("\nSource breakdown:\n"); print(table(eurytemora_data$Source))
 
 # ---- PART 2 — Predictor completeness (full dataset, pre-split) ------------------------------------
 
+add_water_month <- function(df) {
+  df %>% mutate(Water_Month = ((as.numeric(Month_num) + 2) %% 12) + 1)
+}
+
+eurytemora_data     <- add_water_month(eurytemora_data)
+eurytemora_pre1994  <- add_water_month(eurytemora_pre1994)
+eurytemora_post2004 <- add_water_month(eurytemora_post2004)
+
+# Sanity check: Oct -> 1, Dec -> 3, Jan -> 4, Sep -> 12
+table(eurytemora_pre1994$Month_num, eurytemora_pre1994$Water_Month)
+
 env_vars <- c("X2", "Final_Temperature", "Final_Chl", "Final_DO",
               "Final_pH", "Final_Turbidity", "Final_SalSurf")
 
@@ -273,177 +284,197 @@ print(
     summarise(mean_cpue = mean(CPUE, na.rm = TRUE), median_cpue = median(CPUE, na.rm = TRUE), n = n())
 )
 
-# ---- PART 11 — GAMs (14-day lagged Chl + EDSM strata) ------------------------------------
+# ---- PART 11 — GAM, PRE-1994 (strata parametric term + all smooths by strata) ----
 
-eurytemora_pre1994 <- eurytemora_pre1994 %>%
-  mutate(Channel_Station = factor(Channel_Station))
+min_n <- 100   # drop strata with fewer rows than this
 
-class(eurytemora_pre1994$Channel_Station)
+pre_vars <- c("CPUE","X2","Final_Temperature","Final_Chl_lag14",
+              "Final_SalSurf","Water_Month","R_EDSM_Strata_1718P1")
 
-gam_eurytemora_pre1994_final <- gam(
-  CPUE ~ s(X2, k = 15) +
-    s(Final_Temperature, k = 8) +
-    s(Final_Chl_lag14, k = 12) +
-    s(Final_SalSurf, k = 15) +
-    s(Month_num, bs = "cc", k = 10) +
-    s(Channel_Station, bs = "re") +
-    s(R_EDSM_Strata_1718P1, bs = "re"),
-  family = tw(),
-  method = "REML",
-  data = eurytemora_pre1994,
-  knots = list(Month_num = c(0.5, 12.5))
+pre_cc <- eurytemora_pre1994 %>% drop_na(all_of(pre_vars))
+
+keep_strata_pre <- pre_cc %>%
+  count(R_EDSM_Strata_1718P1) %>%
+  filter(n >= min_n) %>%
+  pull(R_EDSM_Strata_1718P1) %>% as.character()
+
+pre1994_g <- pre_cc %>%
+  filter(R_EDSM_Strata_1718P1 %in% keep_strata_pre) %>%
+  mutate(R_EDSM_Strata_1718P1 = factor(R_EDSM_Strata_1718P1)) %>%
+  droplevels()
+
+stopifnot(nlevels(pre1994_g$R_EDSM_Strata_1718P1) >= 2)
+cat("\nStrata kept (pre-1994):\n"); print(table(pre1994_g$R_EDSM_Strata_1718P1))
+
+gam_pre1994_by <- bam(
+  CPUE ~ R_EDSM_Strata_1718P1 +
+    s(X2,                by = R_EDSM_Strata_1718P1, k = 8) +
+    s(Final_Temperature, by = R_EDSM_Strata_1718P1, k = 6) +
+    s(Final_Chl_lag14,   by = R_EDSM_Strata_1718P1, k = 8) +
+    s(Final_SalSurf,     by = R_EDSM_Strata_1718P1, k = 10) +
+    s(Water_Month,       by = R_EDSM_Strata_1718P1, bs = "cc", k = 6),
+  family   = tw(),
+  method   = "fREML",     # fast REML; "REML" is not used with discrete = TRUE
+  discrete = TRUE,
+  nthreads = parallel::detectCores() - 1,
+  gamma    = 1.4,
+  data     = pre1994_g,
+  knots    = list(Water_Month = c(0.5, 12.5))
 )
 
-summary(gam_eurytemora_pre1994_final)
-gam.check(gam_eurytemora_pre1994_final)
-concurvity(gam_eurytemora_pre1994_final, full = TRUE)
+summary(gam_pre1994_by)
+gam.check(gam_pre1994_by)
+concurvity(gam_pre1994_by, full = TRUE)
 
-acf_result_pre1994 <- acf(residuals(gam_eurytemora_pre1994_final), plot = FALSE)
+acf_result_pre1994 <- acf(residuals(gam_pre1994_by), plot = FALSE)
 print(acf_result_pre1994$acf[1:10])
 
-plot(gam_eurytemora_pre1994_final, select = 1, shade = TRUE)
+# ---- PART 11B — GAM, POST-2004 (strata parametric term + all smooths by strata) ----
 
+post_vars <- c("CPUE","X2","Final_Temperature","Final_Chl_lag14",
+               "Final_SalSurf","Water_Month","R_EDSM_Strata_1718P1")
 
-# ---- PART 11B — POST-2004 GAM ##Lagged chlorophyll + environmental variables + EDSM strata ------------------------------------
+post_cc <- eurytemora_post2004 %>% drop_na(all_of(post_vars))
 
-eurytemora_post2004 <- eurytemora_post2004 %>%
-  mutate(
-    Channel_Station = factor(Channel_Station),
-    R_EDSM_Strata_1718P1 = factor(R_EDSM_Strata_1718P1)
-  )
+keep_strata_post <- post_cc %>%
+  count(R_EDSM_Strata_1718P1) %>%
+  filter(n >= min_n) %>%
+  pull(R_EDSM_Strata_1718P1) %>% as.character()
 
-cat("\nEDSM strata coverage, post-2004:\n")
-print(mean(!is.na(eurytemora_post2004$R_EDSM_Strata_1718P1)))
-print(table(eurytemora_post2004$R_EDSM_Strata_1718P1, useNA = "ifany"))
+post2004_g <- post_cc %>%
+  filter(R_EDSM_Strata_1718P1 %in% keep_strata_post) %>%
+  mutate(R_EDSM_Strata_1718P1 = factor(R_EDSM_Strata_1718P1)) %>%
+  droplevels()
 
-cat("\nPredictor coverage, post-2004:\n")
-print(
-  colMeans(!is.na(
-    eurytemora_post2004 %>%
-      select(CPUE, X2, Final_Temperature, Final_Chl_lag14, Final_Turbidity,
-             Final_DO, Final_pH, Final_SalSurf, Month_num,
-             Channel_Station, R_EDSM_Strata_1718P1)
-  ))
+stopifnot(nlevels(post2004_g$R_EDSM_Strata_1718P1) >= 2)
+cat("\nStrata kept (post-2004):\n"); print(table(post2004_g$R_EDSM_Strata_1718P1))
+
+gam_post2004_by <- bam(
+  CPUE ~ R_EDSM_Strata_1718P1 +
+    s(X2,                by = R_EDSM_Strata_1718P1, k = 8) +
+    s(Final_Temperature, by = R_EDSM_Strata_1718P1, k = 6) +
+    s(Final_Chl_lag14,   by = R_EDSM_Strata_1718P1, k = 8) +
+    s(Final_SalSurf,     by = R_EDSM_Strata_1718P1, k = 10) +
+    s(Water_Month,       by = R_EDSM_Strata_1718P1, bs = "cc", k = 6),
+  family   = Tweedie(p = 1.67, link = "log"),
+  method   = "fREML",
+  discrete = TRUE,
+  nthreads = max(1, parallel::detectCores() - 1),
+  gamma    = 1.4,
+  data     = post2004_g,
+  knots    = list(Water_Month = c(0.5, 12.5))
 )
 
-gam_eurytemora_post2004_final <- gam(
-  CPUE ~
-    s(X2, k = 15) +
-    s(Final_Temperature, k = 8) +
-    s(Final_Chl_lag14, k = 10) +
-    s(Final_Turbidity, k = 10) +
-    s(Final_DO, k = 8) +
-    s(Final_pH, k = 8) +
-    s(Final_SalSurf, k = 15) +
-    s(Month_num, bs = "cc", k = 10) +
-    s(Channel_Station, bs = "re") +
-    s(R_EDSM_Strata_1718P1, bs = "re"),
-  family = tw(),
-  method = "REML",
-  data = eurytemora_post2004,
-  knots = list(Month_num = c(0.5, 12.5))
-)
-
-summary(gam_eurytemora_post2004_final)
-gam.check(gam_eurytemora_post2004_final)
-concurvity(gam_eurytemora_post2004_final, full = TRUE)
-
-acf_result_post2004 <- acf(residuals(gam_eurytemora_post2004_final), plot = FALSE)
-print(acf_result_post2004$acf[1:10])
+summary(gam_post2004_by)
+gam.check(gam_post2004_by)
+concurvity(gam_post2004_by, full = TRUE)
+print(acf(residuals(gam_post2004_by), plot = FALSE)$acf[1:10])
 
 
-# ----  PART 12 — PRESENTATION-READY GAM SMOOTH PLOTS (14-day lag, pre-1994) ------------------------------------
+# ---- PART 12 — ONE PAGE PER VARIABLE, ALL STRATA ----
 
-library(mgcv)
-library(ggplot2)
-library(dplyr)
-library(patchwork)
+library(mgcv); library(ggplot2); library(dplyr); library(purrr)
 
-get_smooth_data <- function(model, variable, label, n = 200) {
+# Partial effect of `variable` for every stratum, each drawn only over that
+# stratum's observed range (trimmed at the quantiles to avoid sparse tails).
+get_by_smooth_data <- function(model, variable, by_var = "R_EDSM_Strata_1718P1",
+                               n = 100, trim = c(0.01, 0.99)) {
+  md   <- model$model
+  cols <- setdiff(names(md), names(md)[1])
+  base <- lapply(md[cols], function(col) if (is.numeric(col)) median(col, na.rm = TRUE) else col[1])
   
-  model_data <- model$model
-  
-  x_values <- seq(
-    min(model_data[[variable]], na.rm = TRUE),
-    max(model_data[[variable]], na.rm = TRUE),
-    length.out = n
-  )
-  
-  newdata <- data.frame(
-    X2 = median(model_data$X2, na.rm = TRUE),
-    Final_Temperature = median(model_data$Final_Temperature, na.rm = TRUE),
-    Final_Chl_lag14 = median(model_data$Final_Chl_lag14, na.rm = TRUE),
-    Final_SalSurf = median(model_data$Final_SalSurf, na.rm = TRUE),
-    Month_num = 6,
-    Channel_Station = model_data$Channel_Station[1],
-    R_EDSM_Strata_1718P1 = model_data$R_EDSM_Strata_1718P1[1]
-  )
-  
-  newdata <- newdata[rep(1, length(x_values)), ]
-  newdata[[variable]] <- x_values
-  
-  pred <- predict(model, newdata = newdata, type = "terms", se.fit = TRUE)
-  
-  term_name <- paste0("s(", variable, ")")
-  term_index <- which(colnames(pred$fit) == term_name)
-  
-  fit <- pred$fit[, term_index]
-  se <- pred$se.fit[, term_index]
-  
-  data.frame(
-    x = x_values, fit = fit, se = se,
-    lower = fit - 1.96 * se, upper = fit + 1.96 * se,
-    variable = label
-  )
+  map_dfr(levels(md[[by_var]]), function(lvl) {
+    sub <- md[md[[by_var]] == lvl, ]
+    rng <- quantile(sub[[variable]], trim, na.rm = TRUE)
+    xs  <- seq(rng[1], rng[2], length.out = n)
+    
+    nd <- as.data.frame(base, stringsAsFactors = FALSE)[rep(1, n), , drop = FALSE]
+    nd[[variable]] <- xs
+    nd[[by_var]]   <- factor(lvl, levels = levels(md[[by_var]]))
+    if ("Water_Month" %in% names(nd) && variable != "Water_Month") nd$Water_Month <- 6
+    
+    pred <- predict(model, newdata = nd, type = "terms", se.fit = TRUE)
+    idx  <- which(colnames(pred$fit) == paste0("s(", variable, "):", by_var, lvl))
+    fit  <- pred$fit[, idx]; se <- pred$se.fit[, idx]
+    
+    data.frame(x = xs, fit = fit, se = se,
+               lower = fit - 1.96 * se, upper = fit + 1.96 * se, stratum = lvl)
+  })
 }
 
-d_x2 <- get_smooth_data(gam_eurytemora_pre1994_final, "X2", "Location")
-d_temp <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_Temperature", "Temperature")
-d_chl <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_Chl_lag14", "Chlorophyll-a")
-d_sal <- get_smooth_data(gam_eurytemora_pre1994_final, "Final_SalSurf", "Surface salinity")
-d_month <- get_smooth_data(gam_eurytemora_pre1994_final, "Month_num", "Season")
+water_year_axis <- scale_x_continuous(
+  breaks = 1:12,
+  labels = c("Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep")
+)
 
-# UNITS: y-axis label now notes the effect is unitless (a partial
-# effect on the log scale, not a raw CPUE unit), and every xlab below
-# now carries the variable's actual unit.
-make_gam_plot <- function(dat, title, xlab) {
+# One full page for one variable.
+#   type = "overlay": all strata as coloured lines on a single panel
+#   type = "facet"  : one panel per stratum, with 95% CI ribbons
+plot_variable_page <- function(model, variable, title, xlab, era_label,
+                               type = c("overlay", "facet"),
+                               trim = c(0.01, 0.99), xlim = NULL, season = FALSE) {
+  type <- match.arg(type)
+  dat  <- get_by_smooth_data(model, variable, trim = trim)
+  lv   <- levels(model$model$R_EDSM_Strata_1718P1)
+  cols <- setNames(c("#E69F00","#56B4E9","#009E73","#F0E442",
+                     "#0072B2","#D55E00","#CC79A7","#000000",
+                     "#999999","#882255")[seq_along(lv)], lv)
   
-  ggplot(dat, aes(x = x, y = fit)) +
-    geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.20) +
-    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
-    geom_line(linewidth = 1.2) +
-    labs(title = title, x = xlab, y = "Effect on log(CPUE) (unitless)") +
+  p <- ggplot(dat, aes(x = x, y = fit)) +
+    geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.4)
+  
+  if (type == "overlay") {
+    p <- p + geom_line(aes(colour = stratum), linewidth = 1.1) +
+      scale_colour_manual(values = cols, name = "EDSM stratum")
+  } else {
+    p <- p +
+      geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.20) +
+      geom_line(linewidth = 1) +
+      facet_wrap(~ stratum, scales = "free_x", ncol = 4)
+  }
+  
+  p <- p +
+    labs(title = paste0("Eurytemora — ", title, " by EDSM stratum"),
+         subtitle = paste0(era_label, " (gamma = 1.4, ",
+                           if (type == "overlay") "all strata overlaid)" else "one panel per stratum)"),
+         x = xlab, y = "Effect on log(CPUE) (unitless)") +
     theme_classic(base_size = 14) +
-    theme(
-      plot.title = element_text(face = "bold", size = 15),
-      axis.title = element_text(face = "bold"),
-      axis.text = element_text(color = "black"),
-      plot.margin = margin(10, 10, 10, 10)
-    )
+    theme(plot.title    = element_text(face = "bold", size = 16),
+          axis.title    = element_text(face = "bold"),
+          axis.text     = element_text(color = "black"),
+          strip.text    = element_text(face = "bold"),
+          strip.background = element_blank(),
+          legend.position = "right")
+  
+  if (!is.null(xlim)) p <- p + coord_cartesian(xlim = xlim)
+  if (season)         p <- p + water_year_axis
+  p
 }
 
-g_x2 <- make_gam_plot(d_x2, "Location", "X2 position (km)")
-g_temp <- make_gam_plot(d_temp, "Temperature", "Temperature (deg C)")
-# CHLOROPHYLL: x-axis capped at 50 ug/L - the raw tail beyond this is
-# very sparse (see the variable-diagnostics heatmap) and was stretching
-# the panel with almost no data behind it.
-g_chl <- make_gam_plot(d_chl, "Chlorophyll-a", "14-day lagged chlorophyll-a (ug/L)") +
-  coord_cartesian(xlim = c(0, 50))
-g_sal <- make_gam_plot(d_sal, "Surface salinity", "Surface salinity (PSU)")
-g_month <- make_gam_plot(d_month, "Season", "Month (1-12)")
-
-gam_figure <- (
-  g_x2 | g_temp | g_chl
-) / (
-  g_sal | g_month
-)
-
-gam_figure +
-  plot_annotation(
-    title = "Eurytemora GAM relationships — Pre-1994 period",
-    subtitle = "1975–1993 (14-day lagged chlorophyll-a)"
+# Prints all five variables, one page each, to the plot window and a PDF.
+make_variable_pages <- function(model, era_label, file, type = "overlay") {
+  specs <- list(
+    list("X2",                "Location (X2)",      "X2 position (km)",                  c(0.01, 0.99), NULL,       FALSE),
+    list("Final_Temperature", "Temperature",        "Temperature (deg C)",               c(0.01, 0.99), NULL,       FALSE),
+    list("Final_Chl_lag14",   "Chlorophyll-a",      "14-day lagged chlorophyll-a (ug/L)",c(0.01, 0.99), c(0, 50),   FALSE),
+    list("Final_SalSurf",     "Surface salinity",   "Surface salinity (PSU)",            c(0.01, 0.99), NULL,       FALSE),
+    list("Water_Month",       "Season",             "Water-year month",                  c(0, 1),       NULL,       TRUE)
   )
+  pages <- map(specs, ~ plot_variable_page(model, .x[[1]], .x[[2]], .x[[3]], era_label,
+                                           type = type, trim = .x[[4]],
+                                           xlim = .x[[5]], season = .x[[6]]))
+  walk(pages, print)                         # show in RStudio
+  pdf(file, width = 12, height = 8)          # one variable per page
+  walk(pages, print)
+  dev.off()
+  invisible(pages)
+}
 
+# ---- Run: pre-1994 and post-2004, overlay and per-stratum versions ----
+make_variable_pages(gam_pre1994_by,  "Pre-1994 (1975–1993)",   "eurytemora_pre1994_overlay.pdf",  "overlay")
+make_variable_pages(gam_pre1994_by,  "Pre-1994 (1975–1993)",   "eurytemora_pre1994_facet.pdf",    "facet")
+make_variable_pages(gam_post2004_by, "Post-2004 (2005–2021)",  "eurytemora_post2004_overlay.pdf", "overlay")
+make_variable_pages(gam_post2004_by, "Post-2004 (2005–2021)",  "eurytemora_post2004_facet.pdf",   "facet")
 
 # ---- PART 13 — PRESENTATION-READY POST-2004 GAM SMOOTH PLOTS (14-day lag) ------------------------------------
 

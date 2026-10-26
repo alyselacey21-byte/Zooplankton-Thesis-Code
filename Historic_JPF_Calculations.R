@@ -1,246 +1,261 @@
-# JPF Historic data pull [manually, historic files are not online yet]
 
-#lrm 1/26/26
+
+
+
+
+
+
+
+
+###################Cannot use the PDFs because they are scanned images and no text is picked up my R######################
+
+
+
+
+
+
+
+
+############ Jersey Point Flow (JPF): read DWR hydrology PDFs (in .zip files) + .xlsx, back-calculate JPF ############
+## Run top to bottom. Edit only the CONFIG section and the xlsx_map in section 3.
 
 library(pdftools)
+library(readxl)
 library(slider)
-library(dplyr)
-library(stringr)
-library(here)
-
-## Jersey Point Flow ---------------------------------
-
-## Pull historic data (this covers messy period before JPF calc was included for WY26)
-hydro_rec <- load(here("JPF_historic_WY26.csv"))
-
-# code to pull data for JPF_historic_WY26.csv
-#############################################
-### If you need to manually pull data:
-#    - this code will read pdfs from DWR, may need to download all data first
-#      or request from DWR
+library(tidyverse)   # dplyr, tidyr, stringr, readr, purrr, ggplot2, lubridate
 
 
-# ---- download the PDF Delta Hydrology Conditions (DWR)----
-url1 <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Delta-Status-And-Operations/Delta-Hydrologic-Conditions-Daily-Summary.pdf"
-tmp1 <- tempfile(fileext = ".pdf")
-download.file(url1, tmp1, mode="wb")
+# ---- 0. CONFIG (EDIT THESE) ------------------------------------
 
-pdf1_path <- "data_raw/smelt/20251031rptHydro.pdf"
-pdf2_path <- "data_raw/smelt/20251104rptHydro.pdf"
-pdf3_path <- "data_raw/smelt/20251202rptHydro.pdf"
+data_dir <- "C:/Users/al-la/OneDrive/Desktop/School/Zooplankton/Zooplankton-Thesis-Code/Data_CSVs"
 
-# For PDF without JPF
-# ---- extract raw text ---- 
-txt <- pdf_text(pdf3_path) #change this for specific file
+zips     <- list.files(data_dir, pattern = "^\\d{4}\\.zip$", full.names = TRUE)   # 1999.zip ... 2007.zip
+csv_path <- file.path(data_dir, "qryhydrorpt_2008_2026.csv")
+unzip_dir <- file.path(tempdir(), "jpf_pdfs")
+# Every zip and spreadsheet anywhere under Data_CSVs
+found_zips <- list.files(data_dir, pattern = "\\.zip$",       recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
+found_xlsx <- list.files(data_dir, pattern = "\\.xlsx?$",     recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
+found_zips
+found_xlsx
+zip_dir    <- file.path(data_dir, "JPF_zips")            # folder that holds the .zip files
+xlsx_path  <- file.path(data_dir, "qryhydrorpt_2008_2026.xlsx")      # the one .xlsx
+xlsx_sheet <- 1
+unzip_dir  <- file.path(tempdir(), "jpf_pdfs")           # PDFs are unzipped here (temporary)
 
-# ---- parse page 1 table ----
-page1 <- txt[1] %>% str_split("\n") %>% unlist()
 
-# find lines with data (dates etc.)
-data_lines1 <- page1[str_detect(page1, "\\d{1,2}/\\d{1,2}")]
+walk(zips, ~ unzip(.x, exdir = file.path(unzip_dir, tools::file_path_sans_ext(basename(.x)))))
+pdfs <- list.files(unzip_dir, pattern = "\\.pdf$", recursive = TRUE, full.names = TRUE, ignore.case = TRUE)
+length(pdfs)
+head(basename(pdfs), 10)
 
-# split each row by whitespace
-hydro1 <- data_lines1 %>%
-  str_squish() %>%
-  str_replace_all("[^[:print:]]", "") %>%
-  .[str_detect(., "^\\d{1,2}/\\d{1,2}/\\d{2,4}")] %>%
-  str_split_fixed(" ", n = 11) %>%
-  as.data.frame(stringsAsFactors = FALSE)
+cat(pdf_text(pdfs[1])[1])    # first page of the first PDF
+# ---- 1. PDF parsing helpers ------------------------------------
 
-# add column names
-colnames(hydro1) <- c(
-  "Date","SR_at_Freeport_SRWTP","Yolo_Rumsey_FRE_FWB", "E_side_streams",
-  "SJR_a_Vernalis", "Stockton_rain_in","CCF_cfs",
-  "Tracy_cfs","CCWD_cfs","Barker_Slough_cfs",
-  "Byron_Bethany_cfs"
+# Column layouts of the two tables in the DWR Delta Hydrologic Conditions report.
+# Page-2 table gains a JPF column once DWR started reporting it (WY26, ~12/14/2025).
+cols_t1      <- c("Date", "SR_at_Freeport_SRWTP", "Yolo_Rumsey_FRE_FWB", "E_side_streams",
+                  "SJR_a_Vernalis", "Stockton_rain_in", "CCF_cfs", "Tracy_cfs",
+                  "CCWD_cfs", "Barker_Slough_cfs", "Byron_Bethany_cfs")
+cols_t2_nojpf <- c("Date", "Banks_PP_cfs", "Delta_GCD_cfs", "Rio_Vista_Flow_cfs",
+                   "QWEST_cfs", "NDOI_cfs", "EI_3day", "EI_14day", "Delta_Status")
+cols_t2_jpf   <- c("Date", "Banks_PP_cfs", "Delta_GCD_cfs", "Rio_Vista_Flow_cfs",
+                   "QWEST_cfs", "JPF_cfs", "NDOI_cfs", "EI_3day", "EI_14day", "Delta_Status")
+
+to_num <- function(x) as.numeric(str_remove_all(x, "[^0-9.-]"))
+
+# Lines that start with a date (m/d/yy or m/d/yyyy)
+get_date_lines <- function(page_text) {
+  page_text %>%
+    str_split("\n") %>% unlist() %>%
+    str_replace_all("[^[:print:]]", "") %>%
+    str_squish() %>%
+    .[str_detect(., "^\\d{1,2}/\\d{1,2}/\\d{2,4}")]
+}
+
+lines_to_tbl <- function(lines, cols) {
+  str_split_fixed(lines, " ", n = length(cols)) %>%
+    as.data.frame(stringsAsFactors = FALSE) %>%
+    setNames(cols) %>%
+    as_tibble() %>%
+    mutate(across(-any_of(c("Date", "Delta_Status")), to_num),
+           Date = mdy(Date))
+}
+
+# Parse one PDF. Pages are classified by their header text, not by page number,
+# so a table spilling onto an extra page is still picked up.
+parse_pdf <- function(path) {
+  pages <- pdf_text(path)
+  t1 <- list(); t2 <- list()
+  
+  for (p in pages) {
+    lines <- get_date_lines(p)
+    if (length(lines) == 0) next
+    
+    if (str_detect(p, regex("QWEST", ignore_case = TRUE))) {            # table 2
+      has_jpf <- str_detect(p, regex("JPF|Jersey", ignore_case = TRUE))
+      t2[[length(t2) + 1]] <- lines_to_tbl(lines, if (has_jpf) cols_t2_jpf else cols_t2_nojpf)
+    } else if (str_detect(p, regex("Vernalis|Freeport", ignore_case = TRUE))) {  # table 1
+      t1[[length(t1) + 1]] <- lines_to_tbl(lines, cols_t1)
+    }
+  }
+  
+  if (length(t1) == 0 && length(t2) == 0) return(NULL)
+  
+  t1 <- bind_rows(t1); t2 <- bind_rows(t2)
+  out <- if (nrow(t1) > 0 && nrow(t2) > 0) full_join(t1, t2, by = "Date") else bind_rows(t1, t2)
+  out %>% mutate(source_file = basename(path))
+}
+
+# ---- 2. Unzip and parse every PDF ------------------------------------
+
+
+dir.create(unzip_dir, showWarnings = FALSE, recursive = TRUE)
+walk(zips, ~ unzip(.x, exdir = file.path(unzip_dir, tools::file_path_sans_ext(basename(.x)))))
+
+pdfs <- list.files(unzip_dir, pattern = "\\.pdf$", recursive = TRUE,
+                   full.names = TRUE, ignore.case = TRUE)
+cat("PDFs found:", length(pdfs), "\n")
+
+pdf_tbls <- map(pdfs, possibly(parse_pdf, otherwise = NULL))
+failed   <- pdfs[map_lgl(pdf_tbls, is.null)]
+if (length(failed) > 0) {
+  cat("\nWARNING - no tables parsed from these PDFs (check them by hand):\n")
+  print(basename(failed))
+}
+
+hydro_pdf <- bind_rows(pdf_tbls)
+cat("\nPDF rows parsed:", nrow(hydro_pdf), "\n")
+cat("PDF date range:\n"); print(range(hydro_pdf$Date, na.rm = TRUE))
+
+# ---- 3. Read the .xlsx ------------------------------------
+
+xl <- read_csv(csv_path, show_col_types = FALSE)
+
+# MAP YOUR XLSX COLUMNS to the standard names: new_name = "name in your xlsx".
+# Keep only the lines for columns that exist. Date, SJR_a_Vernalis, E_side_streams,
+# SR_at_Freeport_SRWTP, Stockton_rain_in, Delta_GCD_cfs, CCF_cfs and Tracy_cfs are
+# needed for the back-calculation; JPF_cfs is optional (only if the xlsx has reported JPF).
+xlsx_map <- c(
+  Date                 = "EDIT_ME",
+  SJR_a_Vernalis       = "EDIT_ME",
+  E_side_streams       = "EDIT_ME",
+  SR_at_Freeport_SRWTP = "EDIT_ME",
+  Stockton_rain_in     = "EDIT_ME",
+  Delta_GCD_cfs        = "EDIT_ME",
+  CCF_cfs              = "EDIT_ME",
+  Tracy_cfs            = "EDIT_ME"
+  # , JPF_cfs          = "EDIT_ME"
 )
 
-numeric.col1 <- c("SR_at_Freeport_SRWTP","Yolo_Rumsey_FRE_FWB", "E_side_streams",
-                  "SJR_a_Vernalis", "Stockton_rain_in","CCF_cfs",
-                  "Tracy_cfs","CCWD_cfs","Barker_Slough_cfs",
-                  "Byron_Bethany_cfs")
-hydro1 <- hydro1 %>% 
-  dplyr::filter(str_detect(Date, "\\d{1,2}/\\d{1,2}")) %>% 
-  mutate(across(all_of(numeric.col1),
-                ~ str_remove_all(.x, "[^0-9.-]") %>% as.numeric())) %>% 
-  mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
+if (any(xlsx_map == "EDIT_ME")) stop("Fill in xlsx_map using the column names printed above.")
+if (!all(xlsx_map %in% names(xl))) stop("These xlsx_map names are not in the xlsx: ",
+                                        paste(setdiff(xlsx_map, names(xl)), collapse = ", "))
 
+# Excel dates can arrive as Excel serial numbers, POSIXct, Date or text
+to_date <- function(x) {
+  if (inherits(x, "Date"))        return(x)
+  if (inherits(x, "POSIXt"))      return(as.Date(x))
+  if (is.numeric(x))              return(as.Date(x, origin = "1899-12-30"))
+  suppressWarnings(coalesce(mdy(x), ymd(x)))
+}
 
+hydro_xlsx <- xl %>%
+  rename(all_of(xlsx_map)) %>%
+  select(all_of(names(xlsx_map))) %>%
+  mutate(Date = to_date(Date),
+         across(-Date, ~ if (is.character(.x)) to_num(.x) else as.numeric(.x)),
+         source_file = basename(xlsx_path))
 
-# ---- parse page 2 table ----
-page2 <- txt[2] %>% str_split("\n") %>% unlist()
-data_lines2 <- page2[str_detect(page2, "\\d{1,2}/\\d{1,2}")]
-hydro2 <- data_lines2 %>%
-  str_squish() %>%
-  str_replace_all("[^[:print:]]", "") %>%
-  .[str_detect(., "^\\d{1,2}/\\d{1,2}/\\d{2,4}")] %>%
-  str_split_fixed(" ", n = 9) %>%
-  as.data.frame(stringsAsFactors = FALSE)
+cat("\nxlsx date range:\n"); print(range(hydro_xlsx$Date, na.rm = TRUE))
 
-colnames(hydro2) <- c(
-  "Date","Banks_PP_cfs","Delta_GCD_cfs","Rio_Vista_Flow_cfs",
-  "QWEST_cfs", "NDOI_cfs","EI_3day","EI_14day","Delta_Status"
-)
+# ---- 4. Combine PDFs + xlsx into one daily table ------------------------------------
 
-numeric.col2 <- c("Banks_PP_cfs","Delta_GCD_cfs","Rio_Vista_Flow_cfs",
-                  "QWEST_cfs", "NDOI_cfs","EI_3day","EI_14day")
+hydro_stack <- bind_rows(hydro_pdf, hydro_xlsx) %>% filter(!is.na(Date))
+if (!"JPF_cfs" %in% names(hydro_stack)) hydro_stack$JPF_cfs <- NA_real_
 
-hydro2 <- hydro2 |>
-  dplyr::filter(str_detect(Date, "\\d{1,2}/\\d{1,2}")) %>% 
-  mutate(across(all_of(numeric.col2),
-                ~ str_remove_all(.x, "[^0-9.-]") %>% as.numeric())) %>% 
-  mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
+cat("\nDates that appear in more than one source:\n")
+print(sum(duplicated(hydro_stack$Date)))
 
+# Where a date is in several files, take the first non-missing value per column
+# (PDFs first, then xlsx). Check overlaps above if the sources might disagree.
+hydro_all <- hydro_stack %>%
+  group_by(Date) %>%
+  summarise(across(everything(), ~ first(na.omit(.x))), .groups = "drop") %>%
+  arrange(Date) %>%
+  # Complete daily sequence: lag() below must mean "the previous calendar day",
+  # so any missing days must appear as NA rows rather than being skipped.
+  complete(Date = seq(min(Date), max(Date), by = "day")) %>%
+  arrange(Date)
 
-#join tables
-hydro_comb <- hydro1 %>%
-  left_join(hydro2, by = "Date") %>% 
-  mutate(JPF_cfs = NA)
+cat("\nDaily rows:", nrow(hydro_all), "\n")
+cat("Days with no Vernalis value (gaps):", sum(is.na(hydro_all$SJR_a_Vernalis)), "\n")
 
-#select cols of interest
-hydroOct <- hydro_comb %>%
-  select(Date, SJR_a_Vernalis, E_side_streams, SR_at_Freeport_SRWTP, Stockton_rain_in,
-         Delta_GCD_cfs, JPF_cfs, Banks_PP_cfs, CCF_cfs, Tracy_cfs)
+# ---- 5. Back-calculate JPF ------------------------------------
+# Formula kept exactly as in the DWR script. Inputs are lagged one day, except
+# pumping (same day) and the 5-day precipitation sum (the 5 days before day t).
+# The first ~5 days of the record are NA because the precipitation window is incomplete.
 
-hydroNov <- hydro_comb %>%
-  select(Date, SJR_a_Vernalis, E_side_streams, SR_at_Freeport_SRWTP, Stockton_rain_in,
-         Delta_GCD_cfs, JPF_cfs, Banks_PP_cfs, CCF_cfs, Tracy_cfs)
-
-hydroNov2 <- hydro_comb %>%
-  select(Date, SJR_a_Vernalis, E_side_streams, SR_at_Freeport_SRWTP, Stockton_rain_in,
-         Delta_GCD_cfs, JPF_cfs, Banks_PP_cfs, CCF_cfs, Tracy_cfs)
-
-##############################################
-# ---- For PDF WITH JPF
-#pdf4_path <- "data_raw/smelt/20260101rptHydro.pdf"
-pdf5_path <- "data_raw/smelt/20260129rptHydro.pdf"
-
-
-# ---- extract raw text ---- 
-txt <- pdf_text(pdf5_path)
-
-# ---- parse page 1 table ----
-page1 <- txt[1] %>% str_split("\n") %>% unlist()
-
-# find lines with data (dates etc.)
-data_lines1 <- page1[str_detect(page1, "\\d{1,2}/\\d{1,2}")]
-
-# split each row by whitespace
-hydro1 <- data_lines1 %>%
-  str_squish() %>%
-  str_replace_all("[^[:print:]]", "") %>%
-  .[str_detect(., "^\\d{1,2}/\\d{1,2}/\\d{2,4}")] %>%
-  str_split_fixed(" ", n = 11) %>%
-  as.data.frame(stringsAsFactors = FALSE)
-
-# add column names
-colnames(hydro1) <- c(
-  "Date","SR_at_Freeport_SRWTP","Yolo_Rumsey_FRE_FWB", "E_side_streams",
-  "SJR_a_Vernalis", "Stockton_rain_in","CCF_cfs",
-  "Tracy_cfs","CCWD_cfs","Barker_Slough_cfs",
-  "Byron_Bethany_cfs"
-)
-
-numeric.col1 <- c("SR_at_Freeport_SRWTP","Yolo_Rumsey_FRE_FWB", "E_side_streams",
-                  "SJR_a_Vernalis", "Stockton_rain_in","CCF_cfs",
-                  "Tracy_cfs","CCWD_cfs","Barker_Slough_cfs",
-                  "Byron_Bethany_cfs")
-hydro1 <- hydro1 %>% 
-  dplyr::filter(str_detect(Date, "\\d{1,2}/\\d{1,2}")) %>% 
-  mutate(across(all_of(numeric.col1),
-                ~ str_remove_all(.x, "[^0-9.-]") %>% as.numeric())) %>% 
-  mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
-
-
-
-# ---- parse page 2 table ----
-page2 <- txt[2] %>% str_split("\n") %>% unlist()
-data_lines2 <- page2[str_detect(page2, "\\d{1,2}/\\d{1,2}")]
-hydro2 <- data_lines2 %>%
-  str_squish() %>%
-  str_replace_all("[^[:print:]]", "") %>%
-  .[str_detect(., "^\\d{1,2}/\\d{1,2}/\\d{2,4}")] %>%
-  str_split_fixed(" ", n = 10) %>%
-  as.data.frame(stringsAsFactors = FALSE)
-
-colnames(hydro2) <- c(
-  "Date","Banks_PP_cfs","Delta_GCD_cfs","Rio_Vista_Flow_cfs",
-  "QWEST_cfs", "JPF_cfs", "NDOI_cfs","EI_3day","EI_14day","Delta_Status"
-)
-
-numeric.col2 <- c("Banks_PP_cfs","Delta_GCD_cfs","Rio_Vista_Flow_cfs",
-                  "QWEST_cfs","JPF_cfs", "NDOI_cfs","EI_3day","EI_14day")
-
-hydro2 <- hydro2 |>
-  dplyr::filter(str_detect(Date, "\\d{1,2}/\\d{1,2}")) %>% 
-  mutate(across(all_of(numeric.col2),
-                ~ str_remove_all(.x, "[^0-9.-]") %>% as.numeric())) %>% 
-  mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
-
-#join tables
-hydro_comb <- hydro1 %>%
-  left_join(hydro2, by = "Date")
-
-#select cols of interest
-hydroJan <- hydro_comb %>%
-  select(Date, SJR_a_Vernalis, E_side_streams, SR_at_Freeport_SRWTP, Stockton_rain_in,
-         Delta_GCD_cfs, JPF_cfs, Banks_PP_cfs, CCF_cfs, Tracy_cfs)
-
-
-
-# Combination of files
-
-hydro_rec <- rbind.data.frame(hydroOct, hydroNov[27:28,], hydroNov2, hydroDec[1:27,], hydroJan)
-
-JPF_hist <- hydro_rec[,c(1,7)]
-
-#Save for SacPas
-write_csv(JPF_hist, "JPF_historic_WY26.csv")
-
-##################################################################################
-# CALCULATE HISTORIC JPF (use for data prior to 12/14)
-
-# once you have data pulled into R (see above)
-
-#set up variables
-hydro_calc <- hydro_rec %>%
+hydro_calc <- hydro_all %>%
+  arrange(Date) %>%
   mutate(
-    QXGEO = ((0.133 * SR_at_Freeport_SRWTP) + 829),
-    #Delta_precip = Stockton_rain_in / 12/ 5 * 682230 * 0.5041666604 *0.65,
-    Delta_precip = (Stockton_rain_in * 679000 ) / ( 12 * 1.9835 *5),
-    Delta_prec5d = slide_dbl(Delta_precip, ~sum(.x), .before = 5, .after = -1,
-                             .complete= TRUE),
-    Delta_div = Delta_GCD_cfs, 
-    pumps = CCF_cfs + Tracy_cfs #updated to use CCF- Bogdon says a better gauge for what the pump is taking
+    QXGEO        = 0.133 * SR_at_Freeport_SRWTP + 829,
+    Delta_precip = (Stockton_rain_in * 679000) / (12 * 1.9835 * 5),
+    Delta_prec5d = slide_dbl(Delta_precip, sum, .before = 5, .after = -1, .complete = TRUE),
+    Delta_div    = Delta_GCD_cfs,
+    pumps        = CCF_cfs + Tracy_cfs,     # CCF rather than Banks, per the DWR note
+    JPF_calc     = lag(SJR_a_Vernalis) + lag(E_side_streams) + lag(QXGEO) -
+      0.65 * (lag(Delta_div) - Delta_prec5d) - pumps,
+    # Reported JPF where it exists, calculated JPF everywhere else
+    JPF_final    = coalesce(JPF_cfs, JPF_calc),
+    JPF_source   = case_when(!is.na(JPF_cfs)  ~ "reported",
+                             !is.na(JPF_calc) ~ "calculated",
+                             TRUE             ~ NA_character_)
   )
 
-#calc JPF
+cat("\nJPF source counts:\n"); print(table(hydro_calc$JPF_source, useNA = "ifany"))
 
-hydro_calc <- hydro_calc %>%
-  arrange(Date) %>% 
-  mutate(JPF_calc =
-           lag(SJR_a_Vernalis) + # one day lagged
-           lag(E_side_streams) + # one day lagged
-           lag(QXGEO) - # one day lagged
-           (0.65* (lag(Delta_div) - Delta_prec5d)) - #Delta div one day lagged
-           pumps) # same day
+# ---- 6. Check the calculation against reported JPF ------------------------------------
+# Only possible on days where DWR reported JPF AND all the calc inputs exist.
 
+overlap <- hydro_calc %>% filter(!is.na(JPF_cfs), !is.na(JPF_calc))
 
+if (nrow(overlap) > 0) {
+  cat("\n=== Calculated vs reported JPF (n =", nrow(overlap), "days) ===\n")
+  cat("Correlation:", round(cor(overlap$JPF_cfs, overlap$JPF_calc), 3), "\n")
+  cat("Mean bias (calc - reported), cfs:", round(mean(overlap$JPF_calc - overlap$JPF_cfs), 1), "\n")
+  cat("RMSE, cfs:", round(sqrt(mean((overlap$JPF_calc - overlap$JPF_cfs)^2)), 1), "\n")
+  
+  print(
+    ggplot(overlap, aes(x = JPF_cfs, y = JPF_calc)) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+      geom_point(alpha = 0.7) +
+      labs(title = "Back-calculated vs reported JPF",
+           x = "Reported JPF (cfs)", y = "Calculated JPF (cfs)") +
+      theme_bw(base_size = 14)
+  )
+} else {
+  cat("\nNo days with both reported and calculated JPF, so the calculation can't be validated.\n")
+}
 
+# ---- 7. Plot and save ------------------------------------
 
-# Practice figure
-#ann_start_jpf <- JPF_hist %>% filter(Date == date(start)) %>% pull(JPF_cfs)
+jpf_plot <- ggplot(hydro_calc, aes(x = Date, y = JPF_final, colour = JPF_source)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "#888888", linewidth = 1) +
+  geom_line(aes(group = 1), colour = "grey70") +
+  geom_point(size = 1.5, na.rm = TRUE) +
+  scale_colour_manual(values = c(reported = "darkturquoise", calculated = "#D55E00"),
+                      na.value = "grey50", name = "JPF source") +
+  scale_x_date(date_breaks = "2 weeks", date_labels = "%b %d") +
+  labs(y = "Jersey Point Flow (cfs)", x = NULL) +
+  theme_bw(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-jpf_plot <- jpf_all %>%
-  ggplot(aes(x = date)) +
-  labs(y = 'Flow (cfs)') +
-  annotate("label", x = date(start)+10, y = 15000, label = "Jersey Point Flow", color = "darkturquoise")+
-  geom_hline(yintercept = 0, linetype = 'dashed', color = '#888888', linewidth= 1)+
-  geom_line(aes(y = jpf_cfs), color= "darkturquoise", linewidth = 1) +
-  #scale_color_manual(values = c("#43a419", "gray15")) +
-  scale_x_date(date_breaks = '2 weeks', date_labels = '%b %d') +
-  theme_bw() +
-  theme(legend.position = "none",
-        axis.title.x = element_blank(),
-        axis.text = element_text(size = 15),
-        axis.title= element_text(size = 15))
+print(jpf_plot)
+
+write_csv(hydro_calc, file.path(data_dir, "hydro_cond_all_with_JPF.csv"))
+write_csv(hydro_calc %>% select(Date, JPF_final, JPF_source),
+          file.path(data_dir, "JPF_historic.csv"))
+
+# ---- 8. (Optional) attach JPF to the organism data by Date ------------------------------------
+# organisms_model_reduced <- organisms_model_reduced %>%
+#   left_join(hydro_calc %>% select(Date, JPF_final, JPF_source), by = "Date")
